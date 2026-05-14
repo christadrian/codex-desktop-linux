@@ -9,6 +9,7 @@ const {
   enabledLinuxFeatureIds,
   enabledLinuxFeatureStageHooks,
   loadEnabledLinuxFeatures,
+  loadLinuxFeaturePatchDescriptors,
   loadLinuxFeatureMainBundlePatches,
 } = require("./lib/linux-features.js");
 const {
@@ -177,6 +178,7 @@ module.exports = {
   legacyCorePatchDescriptors,
   linuxTargetSummary,
   loadEnabledLinuxFeatures,
+  loadLinuxFeaturePatchDescriptors,
   loadLinuxFeatureMainBundlePatches,
   normalizePatchDescriptors,
   parseOsRelease,
