@@ -13,6 +13,7 @@ const {
 } = require("../lib/linux-target-context.js");
 const {
   loadLinuxFeatureMainBundlePatches,
+  loadLinuxFeaturePatchDescriptors,
 } = require("../lib/linux-features.js");
 const {
   findIconAsset,
@@ -52,16 +53,19 @@ function legacyCorePatchDescriptors(options = {}) {
   return corePatchDescriptors(options);
 }
 
-function featureMainBundleDescriptors() {
+function featurePatchDescriptors() {
   return normalizePatchDescriptors(
-    loadLinuxFeatureMainBundlePatches().map((patch, index) => ({
-      ...patch,
-      id: patch.id ?? patch.name,
-      name: patch.name ?? patch.id,
-      phase: "main-bundle",
-      order: 20_000 + index * 10,
-      ciPolicy: patch.ciPolicy ?? OPTIONAL,
-    })),
+    [
+      ...loadLinuxFeatureMainBundlePatches().map((patch, index) => ({
+        ...patch,
+        id: patch.id ?? patch.name,
+        name: patch.name ?? patch.id,
+        phase: "main-bundle",
+        order: 20_000 + index * 10,
+        ciPolicy: patch.ciPolicy ?? OPTIONAL,
+      })),
+      ...loadLinuxFeaturePatchDescriptors(),
+    ],
   );
 }
 
@@ -100,7 +104,7 @@ function mainBundlePatchDescriptors(context) {
   return normalizePatchDescriptors([
     ...corePatchDescriptors({ corePatchRoot: context.corePatchRoot })
       .filter((patch) => patch.phase === "main-bundle"),
-    ...featureMainBundleDescriptors(),
+    ...featurePatchDescriptors().filter((patch) => patch.phase === "main-bundle"),
   ]);
 }
 
@@ -115,7 +119,10 @@ function patchMainBundleSource(source, iconAsset, options = {}) {
 function patchExtractedApp(extractedDir, options = {}) {
   const report = options.report ?? null;
   const baseContext = createMainBundleContext(null, options);
-  const coreDescriptors = corePatchDescriptors({ corePatchRoot: options.corePatchRoot });
+  const patchDescriptors = normalizePatchDescriptors([
+    ...corePatchDescriptors({ corePatchRoot: options.corePatchRoot }),
+    ...featurePatchDescriptors(),
+  ]);
 
   setReportLinuxTarget(report, baseContext.linux);
 
@@ -163,21 +170,21 @@ function patchExtractedApp(extractedDir, options = {}) {
 
   applyExtractedAppPatchDescriptors(
     extractedDir,
-    coreDescriptors.filter((patch) => patch.order < EXTRACTED_APP_WEBVIEW_SPLIT_ORDER),
+    patchDescriptors.filter((patch) => patch.order < EXTRACTED_APP_WEBVIEW_SPLIT_ORDER),
     assetContext,
     report,
   );
 
   applyWebviewAssetPatchDescriptors(
     extractedDir,
-    coreDescriptors,
+    patchDescriptors,
     assetContext,
     report,
   );
 
   applyExtractedAppPatchDescriptors(
     extractedDir,
-    coreDescriptors.filter((patch) => patch.order >= EXTRACTED_APP_WEBVIEW_SPLIT_ORDER),
+    patchDescriptors.filter((patch) => patch.order >= EXTRACTED_APP_WEBVIEW_SPLIT_ORDER),
     assetContext,
     report,
   );
@@ -199,7 +206,7 @@ function allPatchPolicies(options = {}) {
       phase,
       appliesTo,
     })),
-    ...featureMainBundleDescriptors().map(({ id, name, ciPolicy, phase, appliesTo }) => ({
+    ...featurePatchDescriptors().map(({ id, name, ciPolicy, phase, appliesTo }) => ({
       name: name ?? id,
       ciPolicy,
       phase,
@@ -239,6 +246,7 @@ module.exports = {
   allPatchPolicies,
   corePatchDescriptors,
   createMainBundleContext,
+  featurePatchDescriptors,
   legacyCorePatchDescriptors,
   patchExtractedApp,
   patchMainBundleSource,
