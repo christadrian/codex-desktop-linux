@@ -452,11 +452,26 @@ function currentLaunchActionBundleFixture() {
   ].join("");
 }
 
+function currentLaunchActionBundleWithWindowApiDriftFixture() {
+  return currentLaunchActionBundleFixture()
+    .replaceAll("createFreshLocalWindow", "createFreshWindow")
+    .replace("getPrimaryWindow()??await M.createFreshWindow(`/`)", "getPrimaryWindow()??await M.createFreshWindow(`/`)")
+    .replace("let n=M.getPrimaryWindow(),r=n??await M.createFreshWindow(e);", "let n=M.getPrimaryWindow(),r=n??await M.createFreshWindow(e);");
+}
+
 function settingsPersistenceBundleFixture() {
   return [
     "let i=require(`node:path`),o=require(`node:fs`);",
     "var s=`.codex-global-state.json`;",
     "const h={\"set-global-state\":async({key:a,value:b,origin:c})=>(this.globalState.set(a,b),Promise.resolve())};",
+  ].join("");
+}
+
+function currentSettingsPersistenceBundleFixture() {
+  return [
+    "let i=require(`node:path`),o=require(`node:fs`);",
+    "var s=`.codex-global-state.json`,c=`config.toml`;",
+    "const h={\"set-global-state\":async({key:a,value:b,origin:c})=>(this.setGlobalStateValue(a,b,c),{success:!0})};",
   ].join("");
 }
 
@@ -531,6 +546,19 @@ function currentBootstrapUpdaterBundleFixture() {
     "let{startedAtMs:r,buildFlavor:a,desktopSentry:o,sparkleManager:s,setSparkleBridgeHandlers:c,setSecondInstanceArgsHandler:l}=t.x(),d=t.T.shouldIncludeSparkle(a,process.platform,process.env);",
     "let M=oG({});let ee=pB(),te=()=>{ee.allowQuitTemporarilyForUpdateInstall(),n.app.quit()};",
     "c({onInstallProgressChanged:e=>{E&&M.sendMessageToAllRegisteredWindows({type:`app-update-install-progress-changed`,installProgressPercent:e})},onUpdateReadyChanged:e=>{M.sendMessageToAllRegisteredWindows({type:`app-update-ready-changed`,isUpdateReady:e})},onUpdateLifecycleStateChanged:e=>{M.sendMessageToAllRegisteredWindows({type:`app-update-lifecycle-state-changed`,lifecycleState:e})},onInstallUpdatesRequested:()=>{te()},isTrustedIpcEvent:N});",
+    "}",
+  ].join("");
+}
+
+function currentBootstrapUpdaterBundleWithParametrizedQuitFixture() {
+  return [
+    "let n=require(`electron`),i=require(`node:path`),o=require(`node:fs`),u=require(`node:child_process`);",
+    "c({onUpdateReadyChanged:e=>{a.sendMessageToAllRegisteredWindows({type:`app-update-ready-changed`,isUpdateReady:e})}});",
+    "var rK={enabled:!1,running:!1,state:`disabled`};",
+    "async function iK(){",
+    "let{startedAtMs:r,buildFlavor:a,desktopSentry:o,sparkleManager:s,setSparkleBridgeHandlers:c,setSecondInstanceArgsHandler:l}=t.x(),d=t.T.shouldIncludeSparkle(a,process.platform,process.env);",
+    "let M=oG({});let ee=pB(),te=null,ne=e=>{if(e?.quitImmediately===!1){ee.allowQuitTemporarilyForUpdateInstall();return}ee.allowQuitTemporarilyForUpdateInstall(),n.app.quit()};",
+    "c({onInstallProgressChanged:e=>{E&&M.sendMessageToAllRegisteredWindows({type:`app-update-install-progress-changed`,installProgressPercent:e})},onUpdateReadyChanged:e=>{M.sendMessageToAllRegisteredWindows({type:`app-update-ready-changed`,isUpdateReady:e})},onUpdateLifecycleStateChanged:e=>{M.sendMessageToAllRegisteredWindows({type:`app-update-lifecycle-state-changed`,lifecycleState:e})},onInstallUpdatesRequested:e=>{ne(e)},isTrustedIpcEvent:N});",
     "}",
   ].join("");
 }
@@ -923,6 +951,17 @@ test("adds Linux avatar overlay mouse passthrough recovery", () => {
   assert.match(patched, /this\.window===t&&\(this\.codexLinuxStopAvatarPassthroughRecovery\(\),this\.codexLinuxAvatarInputShapeKey=null,this\.codexLinuxAvatarCompositorHintsApplied=!1,this\.codexLinuxAvatarCompositorHintsApplying=!1,this\.cancelMomentum\(\)/);
 });
 
+test("keeps avatar overlay layout sync working after layout alias drift", () => {
+  const source = avatarOverlayBundleFixture().replaceAll("r.windowBounds", "n.windowBounds");
+
+  const patched = applyPatchTwice(applyLinuxAvatarOverlayMousePassthroughPatch, source);
+
+  assert.match(
+    patched,
+    /this\.setWindowBounds\(e,n\.windowBounds\),this\.sendLayoutToRenderer\(e\),process\.platform===`linux`&&this\.applyPointerInteractivityPolicy\(\)\}getLayout\(e\)\{/,
+  );
+});
+
 test("adds Linux window icon handling when an icon asset is available", () => {
   const iconAsset = "app-test.png";
   const iconPathExpression = "process.resourcesPath+`/../content/webview/assets/app-test.png`";
@@ -1218,6 +1257,20 @@ test("migrates already-patched Linux settings persistence away from codex-deskto
   }
 });
 
+test("adds Linux settings persistence after current global-state handler drift", () => {
+  const patched = applyPatchTwice(
+    applyLinuxSettingsPersistencePatch,
+    currentSettingsPersistenceBundleFixture(),
+  );
+
+  assert.match(patched, /function codexLinuxSettingsAppId\(\)/);
+  assert.match(patched, /var c=`config\.toml`;/);
+  assert.match(
+    patched,
+    /"set-global-state":async\(\{key:a,value:b,origin:c\}\)=>\(this\.setGlobalStateValue\(a,b,c\),codexLinuxPersistSettingsState\(a,b\),\{success:!0\}\)/,
+  );
+});
+
 test("adds Linux launch actions through current setSecondInstanceArgsHandler bundles", () => {
   const launchPatched = applyPatchTwice(
     applyLinuxLaunchActionArgsPatch,
@@ -1272,6 +1325,36 @@ test("adds Linux launch actions when captured window identifiers contain dollar 
   assert.match(patched, /e\.includes\(`--quick-chat`\)/);
   assert.match(patched, /e\.includes\(`--prompt-chat`\)/);
   assert.match(patched, /e\.includes\(`--hotkey-window`\)/);
+});
+
+test("adds Linux launch actions after current window API drift", () => {
+  const source = currentLaunchActionBundleFixture()
+    .replaceAll("createFreshLocalWindow", "createFreshWindow");
+
+  const patched = applyPatchTwice(applyLinuxLaunchActionArgsPatch, source);
+
+  assert.match(patched, /codexLinuxHandleLaunchActionArgs/);
+  assert.match(patched, /let n=M\.getPrimaryWindow\(B\),r=n\?\?await M\.createFreshWindow\(e\);/);
+  assert.match(patched, /let e=M\.getPrimaryWindow\(B\),t=e\?\?await M\.createFreshWindow\(`/);
+});
+
+test("prewarms the hotkey window after startup marker drift", () => {
+  const launchPatched = applyPatchTwice(
+    applyLinuxLaunchActionArgsPatch,
+    currentLaunchActionBundleFixture()
+      .replaceAll("createFreshLocalWindow", "createFreshWindow")
+      .replace(
+        "let be=await M.ensureHostWindow(B);be&&ae(be),w(`local window ensured`,A,{hostId:B,localWindowVisible:be?.isVisible()??!1}),A=Date.now(),await z.deepLinks.flushPendingDeepLinks();",
+        "let be=await M.ensureHostWindow(B);be&&ae(be),w(`window ensured`,A,{windowVisible:be?.isVisible()??!1}),A=Date.now(),await z.deepLinks.flushPendingDeepLinks();",
+      ),
+  );
+
+  const prewarmPatched = applyPatchTwice(applyLinuxHotkeyWindowPrewarmPatch, launchPatched);
+
+  assert.match(
+    prewarmPatched,
+    /w\(`window ensured`,A,\{windowVisible:be\?\.isVisible\(\)\?\?!1\}\),process\.platform===`linux`&&codexLinuxPrewarmHotkeyWindow\(\),A=Date\.now\(\),await z\.deepLinks\.flushPendingDeepLinks\(\)/,
+  );
 });
 
 test("gates ready-to-show maximize behind restored maximized state", () => {
@@ -1577,6 +1660,19 @@ test("adds Linux package updater to current bootstrap updater wiring", () => {
   assert.match(patched, /installUpdatesIfAvailable:async\(\)=>\{if\(!await c\)\{a\(\);return\}i\(\);if\(!t\)\{a\(\);return\}/);
   assert.match(patched, /refresh:async\(\)=>\{if\(await c\)\{try\{await codexLinuxRefreshUpdateState\(\)\}/);
   assert.doesNotMatch(patched, /codexLinuxRunUpdateManager\(\[`status`,`--json`\]\)/);
+});
+
+test("adds Linux package updater to current bootstrap updater wiring after callback drift", () => {
+  const patched = applyPatchTwice(
+    applyLinuxAppUpdaterBridgePatch,
+    currentBootstrapUpdaterBundleWithParametrizedQuitFixture(),
+  );
+
+  assert.match(patched, /function codexLinuxCreatePackageUpdateManager\(/);
+  assert.match(patched, /codexLinuxPackageUpdateBridge=process\.platform===`linux`/);
+  assert.match(patched, /s=codexLinuxPackageUpdateBridge\.manager/);
+  assert.match(patched, /ne=codexLinuxPackageUpdateBridge\.quitForUpdate/);
+  assert.match(patched, /send:e=>M\.sendMessageToAllRegisteredWindows\(e\)/);
 });
 
 test("migrates already-patched bootstrap updater bridge to probe before enabling UI", () => {
@@ -2136,6 +2232,18 @@ test("patches all Browser Use node_repl approval configs in one pass", () => {
 
   assert.equal((patched.match(/approval_mode:`approve`/g) || []).length, 2);
   assert.doesNotMatch(patched, /startup_timeout_sec:120,env:\{/);
+});
+
+test("auto-approves the current Browser Use node_repl runtime config builder", () => {
+  const source =
+    "return e.Dn({codexCliPath:o.codexCliPath,nodePath:o.nodePath,nodeReplPath:o.nodeReplPath,platform:o.platform})";
+
+  const patched = applyPatchTwice(applyBrowserUseNodeReplApprovalPatch, source);
+
+  assert.match(
+    patched,
+    /e\.Dn\(\{codexCliPath:o\.codexCliPath,nodePath:o\.nodePath,nodeReplPath:o\.nodeReplPath,tools:\{js:\{approval_mode:`approve`\}\},platform:o\.platform\}\)/,
+  );
 });
 
 test("keeps removed IAB visible patch export as a no-op", () => {
