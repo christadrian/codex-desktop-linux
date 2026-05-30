@@ -15,6 +15,7 @@ const linuxSettingsKeys = {
   warmStart: "codex-linux-warm-start-enabled",
   autoUpdateOnExit: "codex-linux-auto-update-on-exit",
   wrapperUpdates: "codex-linux-wrapper-updates-enabled",
+  featurePickerOnUpdate: "codex-linux-feature-picker-on-update",
 };
 
 function readDirectoryNames(dir) {

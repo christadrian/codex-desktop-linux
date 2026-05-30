@@ -31,6 +31,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   version, and falls back to git commit subjects. Packaged frozen bundles
   without a git checkout degrade gracefully (no wrapper tracking; updates arrive
   via a normal package upgrade).
+- The opt-in `codex-wrapper-updater` update action can ask which optional Linux
+  features to enable before rebuilding. The picker reads the recorded candidate
+  wrapper source, preserves unknown/private feature ids from the existing
+  config, saves selections to `~/.config/<appId>/linux-features.json`, and
+  skips without blocking the update when there is no display, no dialog tool, a
+  dialog launch failure, or a cancellation.
 - Launcher rendering mode `CODEX_LINUX_RENDERING_MODE=wayland-gpu`, which
   forces native Wayland with GPU compositing enabled and skips forced renderer
   accessibility by default for Wayland desktops where XWayland or software

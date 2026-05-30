@@ -27,6 +27,13 @@ pub enum Commands {
     },
     /// Apply the recorded wrapper update candidate for the running install.
     ApplyWrapperUpdate,
+    /// Show a GUI checklist of optional Linux features and save the selection to
+    /// the per-user feature config, so the next wrapper rebuild honors it.
+    /// Invoked by the in-app Update button at click time (display still alive).
+    PickFeatures {
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
     CliPreflight {
         #[arg(long)]
         cli_path: Option<PathBuf>,

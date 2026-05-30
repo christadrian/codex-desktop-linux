@@ -15,6 +15,7 @@
 
 use anyhow::{Context, Result};
 use std::{
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -131,10 +132,17 @@ async fn apply_user_local(
     paths: &RuntimePaths,
     candidate_commit: Option<&str>,
 ) -> Result<()> {
+    let feature_config = effective_feature_config(config);
     if let Some(helper) = user_local_update_helper() {
         info!(helper = %helper.display(), "applying wrapper update via user-local helper");
-        let status = Command::new(&helper)
-            .arg("--quiet")
+        let mut cmd = Command::new(&helper);
+        cmd.arg("--quiet");
+        // The contrib helper honors a caller-set CODEX_LINUX_FEATURES_CONFIG over
+        // its repo-local default, so the in-app picker's selection wins.
+        if let Some(config_path) = &feature_config {
+            cmd.env("CODEX_LINUX_FEATURES_CONFIG", config_path);
+        }
+        let status = cmd
             .status()
             .with_context(|| format!("Failed to run {}", helper.display()))?;
         if !status.success() {
@@ -159,11 +167,15 @@ async fn apply_user_local(
         );
     }
     info!(app_dir = %app_dir.display(), "rebuilding user-local app in place via install.sh");
-    let status = Command::new(&install_sh)
-        .current_dir(&wrapper_src)
+    let mut cmd = Command::new(&install_sh);
+    cmd.current_dir(&wrapper_src)
         .env("CODEX_INSTALL_ALLOW_RUNNING", "1")
         .env("CODEX_INSTALL_ROOT", &install_root)
-        .env("CODEX_INSTALL_DIR", &app_dir)
+        .env("CODEX_INSTALL_DIR", &app_dir);
+    if let Some(config_path) = &feature_config {
+        cmd.env("CODEX_LINUX_FEATURES_CONFIG", config_path);
+    }
+    let status = cmd
         .status()
         .with_context(|| format!("Failed to run {}", install_sh.display()))?;
     if !status.success() {
@@ -172,10 +184,20 @@ async fn apply_user_local(
     Ok(())
 }
 
+/// The feature selection to use for this rebuild: saved picker selection first,
+/// then the installed builder bundle's preserved feature config.
+fn effective_feature_config(config: &RuntimeConfig) -> Option<PathBuf> {
+    crate::config::effective_feature_config_path(config)
+}
+
 fn user_local_update_helper() -> Option<PathBuf> {
     let home = std::env::var_os("HOME").map(PathBuf::from)?;
     let candidate = home.join(".local/bin/codex-desktop-update");
-    if candidate.is_file() {
+    if candidate.is_file()
+        && candidate
+            .metadata()
+            .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+    {
         Some(candidate)
     } else {
         None
@@ -242,7 +264,7 @@ async fn apply_packaged(
 
 /// Clones or refreshes a managed wrapper checkout under the workspace cache and
 /// returns its path. Never touches the user's working tree.
-fn ensure_wrapper_source(
+pub(crate) fn ensure_wrapper_source(
     config: &RuntimeConfig,
     paths: &RuntimePaths,
     candidate_commit: Option<&str>,
@@ -376,7 +398,11 @@ fn which(tool: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join(tool);
-        if candidate.is_file() {
+        if candidate.is_file()
+            && candidate
+                .metadata()
+                .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+        {
             return Some(candidate);
         }
     }

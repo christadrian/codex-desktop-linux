@@ -10,17 +10,53 @@ upstream path tracks the official macOS DMG. This feature tracks newer builds of
 
 ## User-facing behavior
 
-- Settings -> General shows:
-  **Check for Codex Desktop Linux updates**.
-- The setting is off by default.
-- When it is on, `codex-update-manager` may check the wrapper repository for a
-  newer Linux wrapper commit.
+- Settings -> General shows **Check for Codex Desktop Linux updates**.
+- Settings -> General also shows **Ask which features to enable on update**.
+- Both settings are off/on independently: wrapper update checks are off by
+  default, and the feature picker prompt defaults on when this feature is built.
+- When wrapper update checks are on, `codex-update-manager` may check the
+  wrapper repository for a newer Linux wrapper commit.
 - If a newer wrapper build is available, a small top-right **Update** button is
   shown inside Codex.
 - The button stays hidden when no wrapper update candidate is recorded.
 - The button tooltip includes the recorded wrapper changelog when available.
-- Clicking the button writes a pending marker and quits Codex. The feature hook
-  applies the wrapper update while the app is stopped.
+- Clicking the button may show the feature picker, then writes a pending marker
+  and quits Codex. The feature hook applies the wrapper update while the app is
+  stopped.
+
+## Feature picker on update
+
+Before writing the marker, the button can run:
+
+```text
+codex-update-manager pick-features
+```
+
+This happens while the display session is still alive. The actual apply step
+runs headless after the app exits.
+
+The picker shows a `zenity` or `kdialog` checklist of optional Linux features,
+pre-checked with the currently enabled set, so the user can choose which
+features the rebuild stages.
+
+- The chosen set is written to:
+
+  ```text
+  ~/.config/<app-id>/linux-features.json
+  ```
+
+- The rebuild points `CODEX_LINUX_FEATURES_CONFIG` at that file.
+- The checklist is loaded from the recorded candidate wrapper source when one is
+  available, so it matches the code that will be rebuilt.
+- Feature ids that are currently enabled but absent from the candidate catalog
+  are preserved.
+- The special **(Don't ask again on future updates)** row, or turning off
+  **Settings -> General -> Ask which features to enable on update**, suppresses
+  future prompts.
+- Cancelling the dialog keeps the current feature set and still proceeds with
+  the update.
+- No display, no dialog tool, no recorded candidate catalog, or a dialog launch
+  failure skips the prompt and leaves the current feature set unchanged.
 
 ## Why this is a Linux feature
 
@@ -29,11 +65,12 @@ not a required compatibility patch for every Linux build. Core only provides the
 generic Linux feature loader and hook runner. This feature owns:
 
 - the in-app wrapper update button;
-- the Settings -> General runtime opt-in;
+- the Settings -> General runtime opt-ins;
 - the main-process bridge handler;
 - the pending-update marker;
 - the retry/apply hook;
-- the updater command integration for wrapper checks and applies.
+- the updater command integration for wrapper checks, feature selection, and
+  applies.
 
 ## Build-time opt-in
 
@@ -67,13 +104,14 @@ Both staged hooks call `apply-pending.sh`.
 
 ## Runtime opt-in
 
-The Settings toggle persists this key:
+The Settings toggles persist these keys:
 
 ```text
 codex-linux-wrapper-updates-enabled
+codex-linux-feature-picker-on-update
 ```
 
-The setting is stored in the normal Linux app settings file:
+The settings are stored in the normal Linux app settings file:
 
 ```text
 ~/.config/<app-id>/settings.json
@@ -85,14 +123,15 @@ For the default app id, that is:
 ~/.config/codex-desktop/settings.json
 ```
 
-The setting is persisted through the app's `get-global-state` /
+The settings are persisted through the app's `get-global-state` /
 `set-global-state` path, not through the upstream typed settings schema. This is
-important because `codex-linux-wrapper-updates-enabled` is a Linux-only key and
-does not exist in upstream's settings schema.
+important because these Linux-only keys do not exist in upstream's settings
+schema.
 
-`codex-update-manager` reads the same setting and treats it as the runtime opt-in
-for wrapper update tracking. The static updater config still defaults wrapper
-tracking to disabled, so existing installs keep their current DMG-only behavior.
+`codex-update-manager` reads the same settings and treats
+`codex-linux-wrapper-updates-enabled` as the runtime opt-in for wrapper update
+tracking. The static updater config still defaults wrapper tracking to disabled,
+so existing installs keep their current DMG-only behavior.
 
 ## Detection flow
 
@@ -127,9 +166,10 @@ Relevant state fields:
 Clicking the in-app **Update** button calls the main-process bridge action
 `install`. The bridge:
 
-1. resolves the current app state directory;
-2. writes the pending marker;
-3. exits Electron.
+1. optionally runs `codex-update-manager pick-features`;
+2. resolves the current app state directory;
+3. writes the pending marker;
+4. exits Electron.
 
 For the default app id, the marker path is:
 
@@ -192,36 +232,47 @@ sed -n '1,160p' /opt/codex-desktop/resources/codex-linux-build-info.json
 Verify the settings patch landed in the installed webview bundle:
 
 ```bash
-rg "CodexLinuxWrapperUpdatesSetting|codex-linux-wrapper-updates-enabled|get-global-state|set-global-state" \
+rg "CodexLinuxWrapperUpdatesSetting|CodexLinuxFeaturePickerOnUpdateSetting|get-global-state|set-global-state" \
   /opt/codex-desktop/content/webview/assets/general-settings-*.js
 ```
 
-Toggle the setting in Settings -> General, then verify:
+Toggle the settings in Settings -> General, then verify:
 
 ```bash
-rg "codex-linux-wrapper-updates-enabled" ~/.config/codex-desktop/settings.json
+rg "codex-linux-wrapper-updates-enabled|codex-linux-feature-picker-on-update" \
+  ~/.config/codex-desktop/settings.json
 ```
 
-Inspect wrapper detection state:
+Inspect wrapper detection state and the picker command:
 
 ```bash
 codex-update-manager check-wrapper --json
 codex-update-manager status --json
+codex-update-manager pick-features --json
 ```
 
 ## Troubleshooting
 
-If the row appears but the toggle immediately reverts, confirm the installed
+If either row appears but the toggle immediately reverts, confirm the installed
 settings bundle uses `get-global-state` and `set-global-state`. If it uses the
-upstream typed settings API, the app will reject the Linux-only key.
+upstream typed settings API, the app will reject the Linux-only keys.
 
 If the **Update** button does not appear, check:
 
-- the Settings toggle is on;
+- the Settings -> General wrapper update toggle is on;
 - `check-wrapper --json` records `candidate_wrapper_commit`;
 - `~/.local/state/codex-update-manager/state.json` contains the candidate;
 - the installed build includes `codex-wrapper-updater` in
   `codex-linux-build-info.json`.
+
+If the feature picker does not appear before the update:
+
+- the Settings -> General feature picker toggle may be off;
+- the app may not have a graphical display session;
+- neither `zenity` nor `kdialog` may be installed;
+- the recorded wrapper candidate may not include a readable feature catalog;
+- the dialog may have been cancelled, in which case the update still proceeds
+  with the existing feature selection.
 
 If the app keeps retrying an update, inspect the pending marker and updater log:
 

@@ -55,6 +55,8 @@ test("main bundle patch writes app-state wrapper marker", () => {
 
   assert.match(patched, /"codex-linux-wrapper-updater":async/);
   assert.match(patched, /CODEX_LINUX_APP_STATE_DIR/);
+  assert.match(patched, /pick-features/);
+  assert.match(patched, /codex-linux-feature-picker-on-update/);
   assert.match(patched, /codex-wrapper-updater/);
   assert.doesNotMatch(patched, /wrapper-update-pending/);
 });
@@ -67,11 +69,13 @@ test("settings patch adds wrapper update toggle", () => {
   const patched = applyWrapperUpdateSettingsPatch(source);
 
   assert.match(patched, /wrapperUpdates:"codex-linux-wrapper-updates-enabled"/);
+  assert.match(patched, /featurePickerOnUpdate:"codex-linux-feature-picker-on-update"/);
   assert.match(patched, /Check for Codex Desktop Linux updates/);
+  assert.match(patched, /Ask which features to enable on update/);
   assert.equal(applyWrapperUpdateSettingsPatch(patched), patched);
 });
 
-test("general settings patch adds wrapper update toggle for current upstream settings", () => {
+test("general settings patch adds wrapper update toggles for current upstream settings", () => {
   const source =
     `function $n(){let D,k,A,j,M;e[16]===Symbol.for(\`react.memo_cache_sentinel\`)?(D=(0,$.jsx)(K,{electron:!0,children:(0,$.jsx)(Br,{})}),k=(0,$.jsx)(zr,{}),A=(0,$.jsx)(Hn,{}),j=(0,$.jsx)(Mr,{}),M=(0,$.jsx)(Pr,{}),e[16]=D,e[17]=k,e[18]=A,e[19]=j,e[20]=M):(D=e[16],k=e[17],A=e[18],j=e[19],M=e[20]);}` +
     `function Br(){return null}function Vr(e,t){return e}`;
@@ -79,12 +83,18 @@ test("general settings patch adds wrapper update toggle for current upstream set
   const patched = applyWrapperUpdateGeneralSettingsPatch(source);
 
   assert.match(patched, /CodexLinuxWrapperUpdatesSetting/);
+  assert.match(patched, /CodexLinuxFeaturePickerOnUpdateSetting/);
   assert.match(patched, /codex-linux-wrapper-updates-enabled/);
+  assert.match(patched, /codex-linux-feature-picker-on-update/);
   assert.match(patched, /Check for Codex Desktop Linux updates/);
+  assert.match(patched, /Ask which features to enable on update/);
   assert.match(patched, /get-global-state/);
   assert.match(patched, /set-global-state/);
   assert.doesNotMatch(patched, /set-setting/);
-  assert.match(patched, /children:\[\(0,\$\.jsx\)\(Br,\{\}\),\(0,\$\.jsx\)\(CodexLinuxWrapperUpdatesSetting,\{\}\)\]/);
+  assert.match(
+    patched,
+    /children:\[\(0,\$\.jsx\)\(Br,\{\}\),\(0,\$\.jsx\)\(CodexLinuxWrapperUpdatesSetting,\{\}\),\(0,\$\.jsx\)\(CodexLinuxFeaturePickerOnUpdateSetting,\{\}\)\]/,
+  );
   assert.equal(applyWrapperUpdateGeneralSettingsPatch(patched), patched);
 });
 
@@ -102,6 +112,7 @@ test("settings asset patch skips re-exported general settings bundles", () => {
     assert.deepEqual(patchWrapperUpdateSettingsAssets(appDir), { matched: true, changed: 1 });
     assert.doesNotMatch(fs.readFileSync(path.join(assetsDir, "general-settings-a.js"), "utf8"), /WrapperUpdates/);
     assert.match(fs.readFileSync(path.join(assetsDir, "general-settings-z.js"), "utf8"), /Check for Codex Desktop Linux updates/);
+    assert.match(fs.readFileSync(path.join(assetsDir, "general-settings-z.js"), "utf8"), /Ask which features to enable on update/);
   } finally {
     fs.rmSync(appDir, { recursive: true, force: true });
   }

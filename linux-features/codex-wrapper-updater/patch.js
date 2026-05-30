@@ -8,6 +8,7 @@ const HANDLER_NAME = "codex-linux-wrapper-updater";
 const RUNTIME_VERSION = "codex-wrapper-updater-v2";
 const KEYBINDS_ASSET = "keybinds-settings-linux.js";
 const WRAPPER_UPDATES_SETTING_KEY = linuxSettingsKeys.wrapperUpdates;
+const FEATURE_PICKER_ON_UPDATE_SETTING_KEY = linuxSettingsKeys.featurePickerOnUpdate;
 
 function warn(message, patchName) {
   console.warn(`WARN: ${message} - skipping ${patchName}`);
@@ -41,8 +42,18 @@ function applyMainBundlePatch(source) {
     `function codexLinuxWrapStatusPayload(){let s=codexLinuxWrapReadStatus();return{ok:!0,show:codexLinuxWrapShouldShow(s),changelog:s?s.wrapper_changelog||\`\`:\`\`,commit:s?s.candidate_wrapper_commit||\`\`:\`\`}}`,
     `function codexLinuxWrapManagerPath(){let e=process.env.CODEX_UPDATE_MANAGER_PATH;return typeof e===\`string\`&&e.trim().length>0?e:\`codex-update-manager\`}`,
     `function codexLinuxWrapSpawnCheck(){try{let c=${childProcessVar}.spawn(codexLinuxWrapManagerPath(),[\`check-wrapper\`],{stdio:\`ignore\`,detached:!0,env:process.env});c.on(\`error\`,()=>{});c.unref()}catch{}}`,
+    // Feature picker on update: resolve settings.json the same way the launcher
+    // and launch-actions do, and gate the on-click picker on the
+    // `codex-linux-feature-picker-on-update` toggle (absent ⇒ ask) plus a live
+    // display. The picker runs synchronously here, at click time, because the
+    // detached apply runs after the app exits with no display.
+    `function codexLinuxWrapSettingsAppId(){let e=process.env.CODEX_LINUX_APP_ID||process.env.CODEX_APP_ID||\`codex-desktop\`;return/^[A-Za-z0-9._-]+$/.test(e)?e:\`codex-desktop\`}`,
+    `function codexLinuxWrapSettingsPath(){let e=process.env.CODEX_LINUX_SETTINGS_FILE;if(typeof e===\`string\`&&e.length>0)return e;let h=codexLinuxWrapHome();let t=process.env.XDG_CONFIG_HOME||(h&&${pathVar}.join(h,\`.config\`));return t?${pathVar}.join(t,codexLinuxWrapSettingsAppId(),\`settings.json\`):null}`,
+    `function codexLinuxWrapPickerEnabled(){try{let p=codexLinuxWrapSettingsPath();if(!p||!${fsVar}.existsSync(p))return!0;let s=JSON.parse(${fsVar}.readFileSync(p,\`utf8\`));if(!s||typeof s!==\`object\`)return!0;let v=s[\`codex-linux-feature-picker-on-update\`];if(v==null)return!0;if(typeof v===\`boolean\`)return v;if(typeof v===\`number\`)return v!==0;if(typeof v===\`string\`){let n=v.trim().toLowerCase();return!([\`0\`,\`false\`,\`no\`,\`off\`].includes(n))}return!0}catch{return!0}}`,
+    `function codexLinuxWrapHasDisplay(){let d=process.env.DISPLAY,w=process.env.WAYLAND_DISPLAY;return!!((d&&d.trim())||(w&&w.trim()))}`,
+    `function codexLinuxWrapRunPicker(){try{${childProcessVar}.spawnSync(codexLinuxWrapManagerPath(),[\`pick-features\`,\`--json\`],{stdio:\`ignore\`,env:process.env})}catch{}}`,
     `function codexLinuxWrapWriteMarker(){let p=codexLinuxWrapMarkerPath();if(!p)return{ok:!1,reason:\`no-marker-path\`};try{${fsVar}.mkdirSync(${pathVar}.dirname(p),{recursive:!0});${fsVar}.writeFileSync(p,new Date().toISOString());return{ok:!0,path:p}}catch(e){return{ok:!1,error:String(e?.message||e)}}}`,
-    `function codexLinuxWrapInstallNow(){let m=codexLinuxWrapWriteMarker();if(!m.ok)return m;try{let a=require(\`electron\`).app;setTimeout(()=>a.exit(0),120);return{ok:!0,path:m.path}}catch(e){return{ok:!1,error:String(e?.message||e)}}}`,
+    `function codexLinuxWrapInstallNow(){if(codexLinuxWrapHasDisplay()&&codexLinuxWrapPickerEnabled())codexLinuxWrapRunPicker();let m=codexLinuxWrapWriteMarker();if(!m.ok)return m;try{let a=require(\`electron\`).app;setTimeout(()=>a.exit(0),120);return{ok:!0,path:m.path}}catch(e){return{ok:!1,error:String(e?.message||e)}}}`,
     `function codexLinuxWrapHandle(e={}){let action=e&&e.action;if(action===\`status\`)return codexLinuxWrapStatusPayload();if(action===\`check\`){codexLinuxWrapSpawnCheck();return{ok:!0}}if(action===\`install\`)return codexLinuxWrapInstallNow();return{ok:!1,reason:\`unknown-action\`}}`,
     `(()=>{if(process.env.CODEX_LINUX_MULTI_LAUNCH!==\`1\`)codexLinuxWrapSpawnCheck()})();`,
   ].join("");
@@ -111,6 +122,16 @@ function applyWrapperUpdateSettingsPatch(source) {
       `${keyNeedle},wrapperUpdates:${JSON.stringify(WRAPPER_UPDATES_SETTING_KEY)}`,
     );
   }
+  if (!next.includes("featurePickerOnUpdate:")) {
+    const wrapperKey = `wrapperUpdates:${JSON.stringify(WRAPPER_UPDATES_SETTING_KEY)}`;
+    if (!next.includes(wrapperKey)) {
+      throw new Error("could not find wrapper update settings key");
+    }
+    next = next.replace(
+      wrapperKey,
+      `${wrapperKey},featurePickerOnUpdate:${JSON.stringify(FEATURE_PICKER_ON_UPDATE_SETTING_KEY)}`,
+    );
+  }
 
   if (!next.includes("Check for Codex Desktop Linux updates")) {
     const toggleNeedle =
@@ -118,16 +139,29 @@ function applyWrapperUpdateSettingsPatch(source) {
     if (!next.includes(toggleNeedle)) {
       throw new Error("could not find Linux update toggle");
     }
+    const pickerToggle =
+      `$.jsx(LinuxToggle,{settingKey:KEYS.featurePickerOnUpdate,label:"Ask which features to enable on update",description:"When on, clicking Update opens a checklist to pick optional Linux features before rebuilding. Turn off to keep your current feature selection without prompting.",defaultValue:!0},"featurePickerOnUpdate")`;
     const wrapperToggle =
-      `children:[$.jsx(LinuxToggle,{settingKey:KEYS.autoUpdateOnExit,label:"Install updates when you close Codex",description:"When on, a ready update waits for Codex to close and then installs. When off, updates wait until you click Update."},"autoUpdateOnExit"),$.jsx(LinuxToggle,{settingKey:KEYS.wrapperUpdates,label:"Check for Codex Desktop Linux updates",description:"Check for Linux wrapper updates from codex-desktop-linux in addition to upstream Codex app updates.",defaultValue:!1},"wrapperUpdates")]`;
+      `children:[$.jsx(LinuxToggle,{settingKey:KEYS.autoUpdateOnExit,label:"Install updates when you close Codex",description:"When on, a ready update waits for Codex to close and then installs. When off, updates wait until you click Update."},"autoUpdateOnExit"),$.jsx(LinuxToggle,{settingKey:KEYS.wrapperUpdates,label:"Check for Codex Desktop Linux updates",description:"Check for Linux wrapper updates from codex-desktop-linux in addition to upstream Codex app updates.",defaultValue:!1},"wrapperUpdates"),${pickerToggle}]`;
     next = next.replace(toggleNeedle, wrapperToggle);
+  } else if (!next.includes("Ask which features to enable on update")) {
+    const existingWrapperToggle =
+      `$.jsx(LinuxToggle,{settingKey:KEYS.wrapperUpdates,label:"Check for Codex Desktop Linux updates",description:"Check for Linux wrapper updates from codex-desktop-linux in addition to upstream Codex app updates.",defaultValue:!1},"wrapperUpdates")`;
+    if (!next.includes(existingWrapperToggle)) {
+      throw new Error("could not find wrapper update toggle");
+    }
+    const pickerToggle =
+      `$.jsx(LinuxToggle,{settingKey:KEYS.featurePickerOnUpdate,label:"Ask which features to enable on update",description:"When on, clicking Update opens a checklist to pick optional Linux features before rebuilding. Turn off to keep your current feature selection without prompting.",defaultValue:!0},"featurePickerOnUpdate")`;
+    next = next.replace(existingWrapperToggle, `${existingWrapperToggle},${pickerToggle}`);
   }
 
   return next;
 }
 
 function applyWrapperUpdateGeneralSettingsPatch(source) {
-  if (source.includes("Check for Codex Desktop Linux updates")) {
+  const hasWrapperSetting = source.includes("Check for Codex Desktop Linux updates");
+  const hasFeaturePickerSetting = source.includes("Ask which features to enable on update");
+  if (hasWrapperSetting && hasFeaturePickerSetting) {
     return source;
   }
 
@@ -136,19 +170,37 @@ function applyWrapperUpdateGeneralSettingsPatch(source) {
     throw new Error("could not find general power settings function");
   }
 
-  const settingFunction =
+  const wrapperSettingFunction = hasWrapperSetting
+    ? ""
+    :
     `function CodexLinuxWrapperUpdatesSetting(){let[e,t]=(0,X.useState)(!1),[n,r]=(0,X.useState)(!0),[i,a]=(0,X.useState)(null),o=x();(0,X.useEffect)(()=>{let e=!0;return r(!0),N(\`get-global-state\`,{params:{key:${JSON.stringify(WRAPPER_UPDATES_SETTING_KEY)}}}).then(n=>{e&&(t(n?.value??!1),a(null))}).catch(t=>{e&&a(t instanceof Error?t.message:String(t))}).finally(()=>{e&&r(!1)}),()=>{e=!1}},[]);let s=(0,$.jsx)(w,{id:\`settings.general.wrapperUpdates.label\`,defaultMessage:\`Check for Codex Desktop Linux updates\`,description:\`Label for Linux wrapper update checks setting\`}),c=(0,$.jsx)(w,{id:\`settings.general.wrapperUpdates.description\`,defaultMessage:\`Check for Linux wrapper updates from codex-desktop-linux in addition to upstream Codex app updates.\`,description:\`Description for Linux wrapper update checks setting\`});i&&(c=(0,$.jsxs)(\`div\`,{className:\`flex flex-col gap-1\`,children:[c,(0,$.jsx)(\`span\`,{className:\`text-token-error-foreground\`,children:i})]}));let l=o.formatMessage({id:\`settings.general.wrapperUpdates.label\`,defaultMessage:\`Check for Codex Desktop Linux updates\`,description:\`Label for Linux wrapper update checks setting\`});return(0,$.jsx)(J,{label:s,description:c,control:(0,$.jsx)(q,{checked:e===!0,disabled:n,onChange:o=>{let s=e;t(o),a(null),N(\`set-global-state\`,{params:{key:${JSON.stringify(WRAPPER_UPDATES_SETTING_KEY)},value:o}}).catch(e=>{t(s),a(e instanceof Error?e.message:String(e))})},ariaLabel:l})})}`;
+  const featurePickerSettingFunction = hasFeaturePickerSetting
+    ? ""
+    :
+    `function CodexLinuxFeaturePickerOnUpdateSetting(){let[e,t]=(0,X.useState)(!0),[n,r]=(0,X.useState)(!0),[i,a]=(0,X.useState)(null),o=x();(0,X.useEffect)(()=>{let e=!0;return r(!0),N(\`get-global-state\`,{params:{key:${JSON.stringify(FEATURE_PICKER_ON_UPDATE_SETTING_KEY)}}}).then(n=>{e&&(t(n?.value??!0),a(null))}).catch(t=>{e&&a(t instanceof Error?t.message:String(t))}).finally(()=>{e&&r(!1)}),()=>{e=!1}},[]);let s=(0,$.jsx)(w,{id:\`settings.general.featurePickerOnUpdate.label\`,defaultMessage:\`Ask which features to enable on update\`,description:\`Label for Linux feature picker on update setting\`}),c=(0,$.jsx)(w,{id:\`settings.general.featurePickerOnUpdate.description\`,defaultMessage:\`When on, clicking Update opens a checklist to pick optional Linux features before rebuilding. Turn off to keep your current feature selection without prompting.\`,description:\`Description for Linux feature picker on update setting\`});i&&(c=(0,$.jsxs)(\`div\`,{className:\`flex flex-col gap-1\`,children:[c,(0,$.jsx)(\`span\`,{className:\`text-token-error-foreground\`,children:i})]}));let l=o.formatMessage({id:\`settings.general.featurePickerOnUpdate.label\`,defaultMessage:\`Ask which features to enable on update\`,description:\`Label for Linux feature picker on update setting\`});return(0,$.jsx)(J,{label:s,description:c,control:(0,$.jsx)(q,{checked:e===!0,disabled:n,onChange:o=>{let s=e;t(o),a(null),N(\`set-global-state\`,{params:{key:${JSON.stringify(FEATURE_PICKER_ON_UPDATE_SETTING_KEY)},value:o}}).catch(e=>{t(s),a(e instanceof Error?e.message:String(e))})},ariaLabel:l})})}`;
 
-  let next = source.replace(functionNeedle, `${settingFunction}${functionNeedle}`);
+  let next = source.replace(
+    functionNeedle,
+    `${wrapperSettingFunction}${featurePickerSettingFunction}${functionNeedle}`,
+  );
 
   const powerRowNeedle = `D=(0,$.jsx)(K,{electron:!0,children:(0,$.jsx)(Br,{})})`;
   const powerRowPatch =
-    `D=(0,$.jsx)(K,{electron:!0,children:(0,$.jsxs)($.Fragment,{children:[(0,$.jsx)(Br,{}),(0,$.jsx)(CodexLinuxWrapperUpdatesSetting,{})]})})`;
-  if (!next.includes(powerRowNeedle)) {
-    throw new Error("could not find general power settings row");
+    `D=(0,$.jsx)(K,{electron:!0,children:(0,$.jsxs)($.Fragment,{children:[(0,$.jsx)(Br,{}),(0,$.jsx)(CodexLinuxWrapperUpdatesSetting,{}),(0,$.jsx)(CodexLinuxFeaturePickerOnUpdateSetting,{})]})})`;
+  if (next.includes(powerRowNeedle)) {
+    next = next.replace(powerRowNeedle, powerRowPatch);
+    return next;
   }
-  next = next.replace(powerRowNeedle, powerRowPatch);
-  return next;
+
+  const existingWrapperRowNeedle = `children:[(0,$.jsx)(Br,{}),(0,$.jsx)(CodexLinuxWrapperUpdatesSetting,{})]`;
+  const existingWrapperRowPatch =
+    `children:[(0,$.jsx)(Br,{}),(0,$.jsx)(CodexLinuxWrapperUpdatesSetting,{}),(0,$.jsx)(CodexLinuxFeaturePickerOnUpdateSetting,{})]`;
+  if (next.includes(existingWrapperRowNeedle)) {
+    next = next.replace(existingWrapperRowNeedle, existingWrapperRowPatch);
+    return next;
+  }
+
+  throw new Error("could not find general power settings row");
 }
 
 function patchWrapperUpdateSettingsAssets(extractedDir) {
@@ -199,6 +251,7 @@ function patchWrapperUpdateSettingsAssets(extractedDir) {
 module.exports = {
   HANDLER_NAME,
   RUNTIME_VERSION,
+  FEATURE_PICKER_ON_UPDATE_SETTING_KEY,
   WRAPPER_UPDATES_SETTING_KEY,
   applyMainBundlePatch,
   applyWebviewRuntimePatch,

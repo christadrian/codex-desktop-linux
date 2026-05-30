@@ -209,6 +209,72 @@ pub fn settings_wrapper_updates_override() -> Option<bool> {
     settings_bool_override(WRAPPER_UPDATES_SETTING_KEY)
 }
 
+const FEATURE_CONFIG_FILE: &str = "linux-features.json";
+const BUNDLED_FEATURE_CONFIG_FILE: &str = "features.json";
+const FEATURE_PICKER_ON_UPDATE_SETTING_KEY: &str = "codex-linux-feature-picker-on-update";
+
+/// Resolves the stable per-user feature-config path
+/// (`<config>/<appId>/linux-features.json`), alongside `settings.json`. The
+/// wrapper-update feature picker writes the chosen `{"enabled":[...]}` here, and
+/// the rebuild points `CODEX_LINUX_FEATURES_CONFIG` at it. Deliberately outside
+/// any wrapper-src checkout so a fresh clone cannot clobber it.
+pub fn feature_config_path() -> Option<PathBuf> {
+    let settings = app_settings_path()?;
+    let dir = settings.parent()?;
+    Some(dir.join(FEATURE_CONFIG_FILE))
+}
+
+/// Returns the feature config that should drive a rebuild. A saved per-user
+/// picker selection wins; otherwise preserve the currently installed/bundled
+/// feature selection from the builder bundle.
+pub fn effective_feature_config_path(config: &RuntimeConfig) -> Option<PathBuf> {
+    feature_config_path()
+        .filter(|path| path.is_file())
+        .or_else(|| {
+            let bundled = config
+                .builder_bundle_root
+                .join("linux-features")
+                .join(BUNDLED_FEATURE_CONFIG_FILE);
+            bundled.is_file().then_some(bundled)
+        })
+}
+
+/// Reads the user's "ask which features to enable on update" preference (the
+/// in-app Update-button feature picker). Absent ⇒ `None` ⇒ caller defaults to
+/// asking.
+pub fn settings_feature_picker_on_update_override() -> Option<bool> {
+    settings_bool_override(FEATURE_PICKER_ON_UPDATE_SETTING_KEY)
+}
+
+/// Persists the "Ask which features to enable on update" preference to the app
+/// `settings.json`, merging into the existing object (preserving every other
+/// key). Used to honor the picker's "Don't ask again" row. Never panics; returns
+/// the IO/serialization error so the caller can log-and-continue.
+pub fn write_feature_picker_on_update(value: bool) -> Result<()> {
+    write_settings_bool(FEATURE_PICKER_ON_UPDATE_SETTING_KEY, value)
+}
+
+/// Read-modify-writes a boolean key into the app `settings.json`, preserving all
+/// other keys. Creates the file (and parent dir) when absent. A malformed
+/// existing file is replaced with a fresh object rather than failing.
+fn write_settings_bool(key: &str, value: bool) -> Result<()> {
+    let path = app_settings_path().context("could not resolve settings.json path")?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).with_context(|| format!("Failed to create {}", dir.display()))?;
+    }
+    let mut object = fs::read_to_string(&path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
+        .and_then(|value| value.as_object().cloned())
+        .unwrap_or_default();
+    object.insert(key.to_string(), serde_json::Value::Bool(value));
+    let serialized = serde_json::to_string_pretty(&serde_json::Value::Object(object))
+        .context("Failed to serialize settings.json")?;
+    fs::write(&path, format!("{serialized}\n"))
+        .with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,6 +381,49 @@ mod tests {
             ),
             Some(false)
         );
+    }
+
+    #[test]
+    fn effective_feature_config_prefers_saved_picker_config_then_builder_config() -> Result<()> {
+        let _guard = crate::test_util::env_lock();
+        let temp = tempdir()?;
+        let settings_dir = temp.path().join("settings");
+        let settings_file = settings_dir.join("settings.json");
+        let saved_feature_config = settings_dir.join("linux-features.json");
+        let builder_feature_config = temp.path().join("builder/linux-features/features.json");
+
+        fs::create_dir_all(builder_feature_config.parent().unwrap())?;
+        fs::write(
+            &builder_feature_config,
+            r#"{"enabled":["codex-wrapper-updater"]}"#,
+        )?;
+        std::env::set_var("CODEX_LINUX_SETTINGS_FILE", &settings_file);
+
+        let paths = RuntimePaths {
+            config_file: temp.path().join("config/config.toml"),
+            state_file: temp.path().join("state/state.json"),
+            log_file: temp.path().join("state/service.log"),
+            cache_dir: temp.path().join("cache"),
+            state_dir: temp.path().join("state"),
+            config_dir: temp.path().join("config"),
+        };
+        let mut config = RuntimeConfig::default_with_paths(&paths);
+        config.builder_bundle_root = temp.path().join("builder");
+
+        assert_eq!(
+            effective_feature_config_path(&config),
+            Some(builder_feature_config.clone())
+        );
+
+        fs::create_dir_all(&settings_dir)?;
+        fs::write(&saved_feature_config, r#"{"enabled":["read-aloud"]}"#)?;
+        assert_eq!(
+            effective_feature_config_path(&config),
+            Some(saved_feature_config)
+        );
+
+        std::env::remove_var("CODEX_LINUX_SETTINGS_FILE");
+        Ok(())
     }
 
     #[test]

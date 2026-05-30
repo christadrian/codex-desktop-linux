@@ -116,25 +116,31 @@ pub async fn build_update_from(
 
     state.status = UpdateStatus::PatchingApp;
     state.save(&paths.state_file)?;
-    run_and_log(
-        Command::new(workspace.bundle_dir.join("install.sh"))
-            .arg(dmg_path)
-            .env("CODEX_INSTALL_DIR", &workspace.app_dir)
-            .env(
-                "CODEX_PATCH_REPORT_JSON",
-                workspace.reports_dir.join("patch-report.json"),
-            )
-            .env(
-                "CODEX_REBUILD_REPORT_JSON",
-                workspace.reports_dir.join("rebuild-report.json"),
-            )
-            .env("CODEX_MANAGED_NODE_SOURCE", managed_node_source)
-            .env("PATH", &build_path)
-            .current_dir(&workspace.bundle_dir),
-        &workspace.install_log,
-    )
-    .await
-    .context("install.sh failed during local rebuild")?;
+    let mut install = Command::new(workspace.bundle_dir.join("install.sh"));
+    install
+        .arg(dmg_path)
+        .env("CODEX_INSTALL_DIR", &workspace.app_dir)
+        .env(
+            "CODEX_PATCH_REPORT_JSON",
+            workspace.reports_dir.join("patch-report.json"),
+        )
+        .env(
+            "CODEX_REBUILD_REPORT_JSON",
+            workspace.reports_dir.join("rebuild-report.json"),
+        )
+        .env("CODEX_MANAGED_NODE_SOURCE", managed_node_source)
+        .env("PATH", &build_path)
+        .current_dir(&workspace.bundle_dir);
+    // Honor the user's saved feature selection (the in-app Update feature picker
+    // writes it to a stable per-user path) so the rebuild stages exactly those
+    // features. Only set it when the file actually exists; an absent path would
+    // make linux-features.js see an empty enabled set and stage nothing.
+    if let Some(feature_config) = crate::config::effective_feature_config_path(config) {
+        install.env("CODEX_LINUX_FEATURES_CONFIG", &feature_config);
+    }
+    run_and_log(&mut install, &workspace.install_log)
+        .await
+        .context("install.sh failed during local rebuild")?;
 
     state.status = UpdateStatus::BuildingPackage;
     state.save(&paths.state_file)?;

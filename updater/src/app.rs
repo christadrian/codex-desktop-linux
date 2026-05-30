@@ -5,7 +5,7 @@ use crate::{
     cli::{Cli, Commands},
     codex_cli,
     config::{RuntimeConfig, RuntimePaths},
-    install, install_rollback, liveness, logging, notify, rollback,
+    feature_picker, install, install_rollback, liveness, logging, notify, rollback,
     state::{CliStatus, PersistedState, UpdateStatus},
     upstream, wrapper, wrapper_apply,
 };
@@ -55,6 +55,7 @@ pub async fn run(cli: Cli) -> Result<()> {
         Commands::ApplyWrapperUpdate => {
             wrapper_apply::run_apply_wrapper_update(&config, &mut state, &paths).await
         }
+        Commands::PickFeatures { json } => feature_picker::run_pick_features(&config, &paths, json),
         Commands::CliPreflight {
             cli_path,
             print_path,
