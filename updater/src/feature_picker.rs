@@ -85,9 +85,10 @@ fn pick(config: &RuntimeConfig, paths: &RuntimePaths) -> Result<PickOutcome> {
     let Some(tool) = dialog_tool() else {
         return Ok(PickOutcome::Skipped("no-dialog-tool"));
     };
-    // Try each candidate source in turn; the first that yields a non-empty
-    // catalog wins. This skips a stale builder bundle whose linux-features.js
-    // predates `--features-json` and falls through to a current checkout.
+    // Try each allowed source in turn; the first that yields a non-empty catalog
+    // wins. If a wrapper-update candidate is recorded, candidate_sources()
+    // returns only that prepared candidate checkout so the picker cannot fall
+    // back to the installed wrapper catalog.
     let mut chosen: Option<(PathBuf, Vec<CatalogEntry>)> = None;
     for source in candidate_sources(config, paths) {
         match read_catalog(config, &source) {
@@ -180,33 +181,29 @@ enum DialogTool {
 /// recorded candidate, fall back to the installed builder bundle for manual
 /// `pick-features` invocations.
 fn candidate_sources(config: &RuntimeConfig, paths: &RuntimePaths) -> Vec<PathBuf> {
-    if let Some(candidate_source) = candidate_wrapper_source(config, paths) {
-        return vec![candidate_source]
-            .into_iter()
-            .filter(|dir| dir.join("scripts/lib/linux-features.js").is_file())
-            .collect();
+    let candidate_commit =
+        PersistedState::load_or_default(&paths.state_file, config.auto_install_on_app_exit)
+            .ok()
+            .and_then(|state| state.candidate_wrapper_commit);
+
+    if let Some(candidate_commit) = candidate_commit.as_deref() {
+        return match wrapper_apply::ensure_wrapper_source(config, paths, Some(candidate_commit)) {
+            Ok(source) if source.join("scripts/lib/linux-features.js").is_file() => vec![source],
+            Ok(_) => Vec::new(),
+            Err(error) => {
+                warn!(
+                    ?error,
+                    "feature picker could not prepare candidate wrapper source"
+                );
+                Vec::new()
+            }
+        };
     }
 
     [config.builder_bundle_root.clone()]
         .into_iter()
         .filter(|dir| dir.join("scripts/lib/linux-features.js").is_file())
         .collect()
-}
-
-fn candidate_wrapper_source(config: &RuntimeConfig, paths: &RuntimePaths) -> Option<PathBuf> {
-    let state =
-        PersistedState::load_or_default(&paths.state_file, config.auto_install_on_app_exit).ok()?;
-    let candidate_commit = state.candidate_wrapper_commit.as_deref()?;
-    match wrapper_apply::ensure_wrapper_source(config, paths, Some(candidate_commit)) {
-        Ok(source) => Some(source),
-        Err(error) => {
-            warn!(
-                ?error,
-                "feature picker could not prepare candidate wrapper source"
-            );
-            None
-        }
-    }
 }
 
 /// Resolves a node binary: the bundle's managed runtime first, then PATH.
@@ -461,6 +458,31 @@ if (arg === "--features-json") {
         .unwrap();
     }
 
+    fn git(repo: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .current_dir(repo)
+            .args(args)
+            .status()
+            .expect("git should run");
+        assert!(status.success(), "git {args:?} failed with {status}");
+    }
+
+    fn init_fake_catalog_repo(repo: &Path) -> String {
+        git(repo, &["init", "-q", "-b", "main"]);
+        git(repo, &["config", "user.email", "codex@example.invalid"]);
+        git(repo, &["config", "user.name", "Codex Test"]);
+        write_fake_catalog_script(repo);
+        git(repo, &["add", "-A"]);
+        git(repo, &["commit", "-q", "-m", "catalog"]);
+        let output = Command::new("git")
+            .current_dir(repo)
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .expect("git rev-parse should run");
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    }
+
     /// Installs a fake dialog tool on a temp PATH that echoes `stdout_lines` and
     /// exits with `exit_code`. Returns the temp dir (keep alive) and the PATH.
     fn fake_dialog(
@@ -506,6 +528,60 @@ if (arg === "--features-json") {
         assert_eq!(
             candidate_sources(&config, &paths),
             vec![root.path().to_path_buf()]
+        );
+    }
+
+    #[test]
+    fn candidate_sources_uses_recorded_candidate_checkout() {
+        let _g = env_lock();
+        let root = tempdir().unwrap();
+        let remote = tempdir().unwrap();
+        let paths = runtime_paths(root.path());
+        paths.ensure_dirs().unwrap();
+        write_fake_catalog_script(root.path());
+        let commit = init_fake_catalog_repo(remote.path());
+
+        let mut config = base_config(root.path());
+        config.wrapper_remote =
+            format!("file://{}", remote.path().canonicalize().unwrap().display());
+        let mut state = PersistedState::new(true);
+        state.candidate_wrapper_commit = Some(commit);
+        state.save(&paths.state_file).unwrap();
+
+        assert_eq!(
+            candidate_sources(&config, &paths),
+            vec![paths.cache_dir.join("wrapper-src")]
+        );
+    }
+
+    #[test]
+    fn candidate_sources_do_not_fallback_when_recorded_candidate_cannot_be_prepared() {
+        let _g = env_lock();
+        let root = tempdir().unwrap();
+        let paths = runtime_paths(root.path());
+        paths.ensure_dirs().unwrap();
+        write_fake_catalog_script(root.path());
+
+        let config = base_config(root.path());
+        let mut state = PersistedState::new(true);
+        state.candidate_wrapper_commit = Some("a".repeat(40));
+        state.save(&paths.state_file).unwrap();
+
+        let empty_path = tempdir().unwrap();
+        let previous_path = std::env::var_os("PATH");
+        std::env::set_var("PATH", empty_path.path());
+
+        let sources = candidate_sources(&config, &paths);
+
+        if let Some(previous_path) = previous_path {
+            std::env::set_var("PATH", previous_path);
+        } else {
+            std::env::remove_var("PATH");
+        }
+
+        assert!(
+            sources.is_empty(),
+            "recorded candidate failures must not use the installed catalog"
         );
     }
 
