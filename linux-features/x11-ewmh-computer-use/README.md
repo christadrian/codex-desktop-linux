@@ -42,7 +42,7 @@ CODEX_X11_COMPUTER_USE_RELEASE_TARBALL=/path/to/codex-computer-use-x11-v<VERSION
 CODEX_X11_COMPUTER_USE_RELEASE_SHA256=<expected-sha256>
 ```
 
-Default pinned release mode downloads and verifies v0.1.3 for x86_64 Linux:
+Default pinned release mode downloads and verifies v0.1.3 for x86_64 Linux only. Unsupported architectures fail fast unless you provide an explicit source, binary, tarball, or download override:
 
 ```bash
 CODEX_X11_COMPUTER_USE_DOWNLOAD_URL=https://github.com/AlekseiSeleznev/codex-computer-use-x11/releases/download/v0.1.3/codex-computer-use-x11-v0.1.3-x86_64-unknown-linux-gnu.tar.gz

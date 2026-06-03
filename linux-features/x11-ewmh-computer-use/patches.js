@@ -74,10 +74,7 @@ function applyX11ComputerUsePluginGatePatch(currentSource) {
   if (hasX11ComputerUsePluginGate(currentSource)) return currentSource;
   const pluginGateArray = findBundledPluginGateArray(currentSource);
   if (pluginGateArray == null) {
-    if (currentSource.includes(".computerUse")) {
-      throw new Error("Required X11 Computer Use plugin gate patch failed: could not find bundled plugin descriptor array");
-    }
-    return currentSource;
+    throw new Error("Optional X11 Computer Use plugin gate patch drift: could not find expected upstream .computerUse plugin descriptor array");
   }
   const match = findAlwaysOnBundledDescriptor(pluginGateArray);
   if (match == null) {
@@ -93,7 +90,7 @@ const descriptors = [
     id: "x11-ewmh-computer-use-plugin-gate",
     phase: "main-bundle",
     order: 156,
-    ciPolicy: "required-upstream",
+    ciPolicy: "optional",
     apply: applyX11ComputerUsePluginGatePatch,
   },
 ];
