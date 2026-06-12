@@ -1,60 +1,48 @@
-# Memory — Light Sidebar Linux Feature
+# Memory - Light Sidebar Dark Mode Fix
 
-Last updated: 2026-06-12 03:54:08 EAT
+Last updated: 2026-06-12 04:08:19 EAT
 
 ## What was built
 
-- Added opt-in Linux feature `light-sidebar` under `linux-features/light-sidebar/`.
-- Created `linux-features/light-sidebar/patch.js` with a `webview-asset` descriptor that patches hashed `app--*.css` bundles during `install.sh`/package builds.
-- Created `linux-features/light-sidebar/test.js` covering CSS rule insertion and idempotency.
-- Created `linux-features/light-sidebar/README.md` with Arch-focused build/install instructions.
-- Added `scripts/apply-light-sidebar.sh` as an emergency installed-app hotpatch helper for `/opt/codex-desktop`.
-- Added `scripts/build-light-sidebar-deb.sh` and `scripts/build-light-sidebar-pacman.sh`; the pacman helper is the relevant one for Christadrian's Arch machine.
-- Updated `docs/build-and-packaging.md` to install Arch packages via `dist/codex-desktop-latest.pkg.tar.zst` instead of a wildcard.
+- Fixed `linux-features/light-sidebar/patch.js` so the light sidebar CSS is scoped to `[data-codex-window-type="electron"].electron-light` instead of `@media (prefers-color-scheme: light)`.
+- Updated the light-sidebar descriptor pattern to match current upstream CSS bundles: `app-*.css` and `app-main-*.css`.
+- Updated `linux-features/light-sidebar/test.js` with regressions for dark-mode scope and current bundle names.
+- Regenerated local `codex-app/` with `./install.sh ./Codex.dmg`; generated CSS now contains `codex-linux-light-sidebar-v2` in current app CSS bundles with `.electron-light` selectors.
+- Committed and pushed `8b30566 Fix light sidebar dark mode scope` to `origin/main`.
 
 ## Decisions made
 
-- Durable fix lives in the Linux feature patch pipeline, not direct edits to `/opt/codex-desktop/content/webview/assets/*.css`.
-- `light-sidebar` remains opt-in and disabled by default in tracked config, consistent with repository feature rules.
-- Local `linux-features/features.json` is gitignored and was created/enabled locally with `light-sidebar` so manual builds apply the patch.
-- Arch install should use `make pacman`/`build-pacman.sh` and `sudo pacman -U dist/codex-desktop-latest.pkg.tar.zst`, not Debian `.deb` flow.
+- The light sidebar feature should follow Codex app theme classes, not OS color-scheme media queries. This prevents a light OS theme from forcing light sidebar/titlebar-adjacent CSS while Codex itself is in dark mode.
+- The durable fix remains in the opt-in Linux feature patch pipeline, not direct edits to generated installed CSS.
+- Christadrian will build/package manually. No package artifact was built after the source fix.
 
 ## Problems solved
 
-- Earlier one-off script patched installed CSS directly; Codex updates overwrote it. The new feature is reapplied during rebuild/update packaging.
-- `./install.sh ./Codex.dmg` failed because no local `Codex.dmg` existed; corrected instructions to use `./install.sh` or `make build-app` unless a real DMG path is provided.
-- `sudo pacman -U dist/codex-desktop-*.pkg.tar.zst` failed with `duplicate target` because the glob matched both the real package and `codex-desktop-latest.pkg.tar.zst` symlink. Docs now use the stable symlink path directly.
-- Commit signing failed once due 1Password (`failed to fill whole buffer`); first commit was made unsigned with hooks still enabled. Later commits succeeded normally.
+- The dark-mode screenshot issue was caused by the light-sidebar CSS applying under `prefers-color-scheme: light`, which can be true when Codex is manually set to dark mode.
+- `light-sidebar` was also not applying during rebuild because the descriptor still targeted stale `app--*.css` names. Current bundles are named like `app-D6IMMkHW.css`, `app-main-C8zHCT66.css`, and `app-shell-DJDX7Pvr.css`.
 
 ## Current state
 
-- Branch `main` is clean and pushed to `origin/main`.
-- Latest pushed commits:
-  - `fb5b2df Fix Arch pacman install docs`
-  - `682dba3 Add light sidebar pacman build helper`
-  - `9f97489 Fix light sidebar build instructions`
-  - `c47d3ef Add light sidebar Linux feature`
-- Christadrian built pacman package successfully at `dist/codex-desktop-2026.06.12.004759-1-x86_64.pkg.tar.zst`.
-- `dist/codex-desktop-latest.pkg.tar.zst` points to that package.
-- Install command to use now: `sudo pacman -U dist/codex-desktop-latest.pkg.tar.zst`.
-- Verification run during session:
-  - `node --test linux-features/light-sidebar/test.js` passed 2/2.
+- Branch `main` is pushed to `origin/main` at `8b30566`.
+- Working tree should be clean except generated/ignored build output from `codex-app/` regeneration.
+- Verification completed:
+  - `node --test linux-features/light-sidebar/test.js` passed 3/3.
   - `node --test scripts/patch-linux-window-ui.test.js` passed 221/221.
-  - `node --test linux-features/*/test.js` passed 266/266.
-  - shell syntax checks passed for helper scripts.
+  - `node --test linux-features/*/test.js` passed 267/267.
+  - `./install.sh ./Codex.dmg` completed and generated CSS marker verification passed.
 
 ## Next session starts with
 
-Run:
+Christadrian can build manually, likely:
 
 ```bash
 cd /home/christadrian/Projects/codex-desktop-fork
+./scripts/build-pacman.sh
 sudo pacman -U dist/codex-desktop-latest.pkg.tar.zst
 ```
 
-Then fully quit and relaunch Codex Desktop. If the sidebar is still dark in light mode, inspect the installed CSS for `codex-linux-light-sidebar-v2` and verify the app is using light/system appearance.
+Then fully quit and relaunch Codex Desktop. Confirm light mode still has a light sidebar, and dark mode no longer shows the light strip from the screenshot.
 
 ## Open questions
 
-- Need visual confirmation after installing and restarting that the sidebar is light in Codex light mode.
-- If the patch applies but UI remains dark, the CSS selectors/variables may need updating against the current upstream webview bundle.
+- Need visual confirmation after manual package install and app restart.
