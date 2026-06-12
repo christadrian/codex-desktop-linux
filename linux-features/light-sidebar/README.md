@@ -15,29 +15,43 @@ Add the feature id to `linux-features/features.json`:
 }
 ```
 
-Then rebuild the app or package from this repository. Without a DMG path,
-`install.sh` downloads or reuses the cached upstream DMG automatically:
+Then rebuild the app or package from this repository. On Arch-family systems,
+the native package format is pacman (`.pkg.tar.zst`):
+
+```bash
+make build-app
+make pacman
+```
+
+Or build and install in one flow:
+
+```bash
+make install-native
+```
+
+Without a DMG path, `install.sh` downloads or reuses the cached upstream DMG
+automatically:
 
 ```bash
 ./install.sh
-./scripts/build-deb.sh
+./scripts/build-pacman.sh
 ```
 
 If you already have a local DMG, pass its real path explicitly:
 
 ```bash
 ./install.sh /path/to/Codex.dmg
-./scripts/build-deb.sh
+./scripts/build-pacman.sh
 ```
 
-For Debian-family packages, this helper enables the feature and runs the same
+For Arch-family packages, this helper enables the feature and runs the same
 build flow:
 
 ```bash
-./scripts/build-light-sidebar-deb.sh
+./scripts/build-light-sidebar-pacman.sh
 ```
 
-Use the package builder matching your install format if you do not use Debian.
+Use the package builder matching your install format if you do not use Arch.
 
 ## Test
 
