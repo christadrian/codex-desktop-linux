@@ -15,11 +15,26 @@ Add the feature id to `linux-features/features.json`:
 }
 ```
 
-Then rebuild the app or package from this repository:
+Then rebuild the app or package from this repository. Without a DMG path,
+`install.sh` downloads or reuses the cached upstream DMG automatically:
 
 ```bash
-./install.sh ./Codex.dmg
+./install.sh
 ./scripts/build-deb.sh
+```
+
+If you already have a local DMG, pass its real path explicitly:
+
+```bash
+./install.sh /path/to/Codex.dmg
+./scripts/build-deb.sh
+```
+
+For Debian-family packages, this helper enables the feature and runs the same
+build flow:
+
+```bash
+./scripts/build-light-sidebar-deb.sh
 ```
 
 Use the package builder matching your install format if you do not use Debian.
