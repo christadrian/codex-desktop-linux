@@ -51,6 +51,14 @@ build flow:
 ./scripts/build-light-sidebar-pacman.sh
 ```
 
+Install the generated package with the stable `latest` symlink, or use
+`make install`. Avoid `dist/codex-desktop-*.pkg.tar.zst`, because that glob also
+matches the `latest` symlink and gives pacman a duplicate target.
+
+```bash
+sudo pacman -U dist/codex-desktop-latest.pkg.tar.zst
+```
+
 Use the package builder matching your install format if you do not use Arch.
 
 ## Test

@@ -109,7 +109,7 @@ After `make build-app` or `make build-app-fresh`, build a package from
 |---|---|---|---|
 | Debian | `make deb` | `dist/codex-desktop_*.deb` | `sudo dpkg -i dist/codex-desktop_*.deb` |
 | RPM | `make rpm` | `dist/codex-desktop-*.x86_64.rpm` | `sudo dnf install dist/codex-desktop-*.rpm` or `sudo zypper install dist/codex-desktop-*.rpm` |
-| Arch | `make pacman` | `dist/codex-desktop-*.pkg.tar.zst` | `sudo pacman -U dist/codex-desktop-*.pkg.tar.zst` |
+| Arch | `make pacman` | `dist/codex-desktop-latest.pkg.tar.zst` | `sudo pacman -U dist/codex-desktop-latest.pkg.tar.zst` |
 | AppImage | `make appimage` | `dist/codex-desktop-*.AppImage` | Run directly |
 | Auto-detect | `make package && make install` | matches host distro | handled by `make install` |
 
