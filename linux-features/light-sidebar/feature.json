@@ -1,0 +1,9 @@
+{
+  "id": "light-sidebar",
+  "title": "Light Sidebar",
+  "description": "Force the Codex sidebar to use light colors when the app is in light theme mode.",
+  "defaultEnabled": false,
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}
