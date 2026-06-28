@@ -18,6 +18,11 @@ linux-features/local/
 .claude/
 .codex/
 
+
+# Upstream app chunks sometimes get extracted into the repo root; never commit them
+/*.js
+/*.mjs
+/*.cjs
 # graphify
 graphify-out/
 .graphify_*
