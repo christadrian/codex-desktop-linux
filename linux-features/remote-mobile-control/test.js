@@ -732,6 +732,7 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
       "webview-asset",
       "webview-asset",
       "webview-asset",
+      "webview-asset",
     ]);
 
     const visibilityDescriptor = descriptors.find((descriptor) =>
