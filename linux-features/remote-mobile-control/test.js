@@ -25,6 +25,7 @@ const {
   applyLinuxRemoteControlCopyPatch,
   applyLinuxRemoteControlPreserveConfigPatch,
   applyLinuxRemoteControlFeatureSyncPatch,
+  applyLinuxRemoteControlEnableForHostParamsPatch,
   applyLinuxRemoteControlLoadGatePatch,
   applyLinuxRemoteControlEnablementBridgePatch,
   applyLinuxRemoteMobileActiveStatusPatch,
@@ -704,6 +705,7 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
       "feature:remote-mobile-control:linux-remote-connections-refresh",
       "feature:remote-mobile-control:linux-remote-mobile-conversation-hydration",
       "feature:remote-mobile-control:linux-remote-control-status-read-guard",
+      "feature:remote-mobile-control:linux-remote-control-enable-for-host-params",
       "feature:remote-mobile-control:linux-remote-control-enablement-bridge",
       "feature:remote-mobile-control:linux-remote-mobile-active-status",
       "feature:remote-mobile-control:linux-remote-mobile-projectless-remote-task",
@@ -727,6 +729,7 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
       "webview-asset",
       "webview-asset",
       "webview-asset",
+      "webview-asset",
     ]);
 
     const visibilityDescriptor = descriptors.find((descriptor) =>
@@ -736,6 +739,17 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
     assert.equal(visibilityDescriptor.pattern.test("remote-connections-settings-fixture.js"), true);
     assert.equal(visibilityDescriptor.pattern.test("use-plugin-install-flow-fixture.js"), true);
     assert.equal(visibilityDescriptor.pattern.test("app-main-fixture.js"), false);
+
+    const statusGuardDescriptor = descriptors.find((descriptor) =>
+      descriptor.id === "feature:remote-mobile-control:linux-remote-control-status-read-guard"
+    );
+    assert.ok(statusGuardDescriptor);
+    assert.equal(
+      statusGuardDescriptor.pattern.test(
+        "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~pull-requests-page~plug~kmtatxxf-IUI8plS9.js",
+      ),
+      true,
+    );
   });
 });
 
@@ -1658,6 +1672,34 @@ test("Linux remote-control status guard skips slow remote SSH status reads", asy
   assert.equal(values.get("local").status, "enabled");
 });
 
+test("Linux remote-control status guard skips remote-control environment status reads", () => {
+  const source = syntheticAppServerManagerStatusBundle();
+  const patched = applyLinuxRemoteControlStatusReadGuardPatch(source);
+
+  assert.match(patched, /startsWith\(`remote-control:`\)/);
+
+  const context = {
+    module: { exports: {} },
+    navigator: { userAgent: "X11; Linux x86_64" },
+  };
+  vm.runInNewContext(`${patched};module.exports={codexLinuxRemoteControlShouldReadStatus};`, context);
+  const { codexLinuxRemoteControlShouldReadStatus } = context.module.exports;
+
+  assert.equal(codexLinuxRemoteControlShouldReadStatus("remote-control:env_test"), false);
+  assert.equal(codexLinuxRemoteControlShouldReadStatus("remote-ssh-discovered:dev"), false);
+  assert.equal(codexLinuxRemoteControlShouldReadStatus("local"), true);
+});
+
+test("Linux remote-control status guard migrates older remote-ssh-only guard", () => {
+  const oldPatched = applyLinuxRemoteControlStatusReadGuardPatch(syntheticAppServerManagerStatusBundle()).replace(
+    "||e.startsWith(`remote-control:`)",
+    "",
+  );
+  const patched = applyLinuxRemoteControlStatusReadGuardPatch(oldPatched);
+
+  assert.match(patched, /startsWith\(`remote-control:`\)/);
+});
+
 test("Linux remote-control settings UX patch warns when SSH release handling drifts after partial patching", () => {
   const source = (syntheticSettingsBundle() + syntheticSshInstallSettingsBundle()).replace(
     "installedCodexVersion:h",
@@ -1819,6 +1861,33 @@ test("Linux remote-control enablement bridge omits params for current host toggl
   const calls = [];
   const context = {
     pU: (handler) => handler,
+    host: {
+      sendRequest(method, params) {
+        calls.push({ method, params });
+        return Promise.resolve({ status: "enabled" });
+      },
+    },
+  };
+  await vm.runInNewContext(`${patched};handlers["set-remote-control-enabled-for-host"](host,{enabled:true});`, context);
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "remoteControl/enable");
+  assert.equal(calls[0].params, undefined);
+});
+
+test("Linux remote-control host toggle params patch handles automations app-main bundle", async () => {
+  const source =
+    "var handlers={\"set-remote-control-enabled-for-host\":Q7((e,{enabled:t})=>e.sendRequest(t?`remoteControl/enable`:`remoteControl/disable`,null)),\"start-remote-control-pairing-for-host\":Q7((e,{manualCode:t})=>e.sendRequest(`remoteControl/pairing/start`,{manualCode:t}))};";
+  const patched = applyLinuxRemoteControlEnableForHostParamsPatch(source);
+
+  assert.notEqual(patched, source);
+  assert.match(patched, /codexLinuxRemoteControlEnableForHostParams/);
+  assert.doesNotMatch(patched, /remoteControl\/disable`,null/);
+  assert.equal(applyLinuxRemoteControlEnableForHostParamsPatch(patched), patched);
+
+  const calls = [];
+  const context = {
+    Q7: (handler) => handler,
     host: {
       sendRequest(method, params) {
         calls.push({ method, params });

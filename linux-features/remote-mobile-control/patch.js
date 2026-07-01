@@ -1316,7 +1316,13 @@ function applyLinuxRemoteMobileConversationHydrationPatch(source) {
 }
 
 function applyLinuxRemoteControlStatusReadGuardPatch(source) {
-  if (source.includes(REMOTE_CONTROL_STATUS_READ_GUARD_MARKER) || !source.includes("remoteControl/status/read")) {
+  if (source.includes(REMOTE_CONTROL_STATUS_READ_GUARD_MARKER)) {
+    return source.replace(
+      /function codexLinuxRemoteControlShouldReadStatus\(e\)\{return !\(typeof navigator!=`undefined`&&navigator\.userAgent\.includes\(`Linux`\)&&typeof e==`string`&&\(?e\.startsWith\(`remote-ssh`\)\)?\)\}/u,
+      `function ${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(e){return !(typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)&&typeof e==\`string\`&&(e.startsWith(\`remote-ssh\`)||e.startsWith(\`remote-control:\`)))}`,
+    );
+  }
+  if (!source.includes("remoteControl/status/read")) {
     return source;
   }
 
@@ -1338,7 +1344,7 @@ function applyLinuxRemoteControlStatusReadGuardPatch(source) {
       loggerVar,
     ] = match;
     const replacement =
-      `function ${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(e){return !(typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)&&typeof e==\`string\`&&e.startsWith(\`remote-ssh\`))}` +
+      `function ${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(e){return !(typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)&&typeof e==\`string\`&&(e.startsWith(\`remote-ssh\`)||e.startsWith(\`remote-control:\`)))}` +
       `function ${functionName}(${storeVar},${clientVar}){let ${hostVar}=${clientVar}.getHostId(),${generationVar}=${generationFn}(${storeVar},${hostVar}),${initialValueVar}=${storeVar}.get(${statusAtomVar},${hostVar});` +
       `${clientVar}.addNotificationCallback(\`remoteControl/status/changed\`,({params:${notificationParamsVar}})=>{${isCurrentFn}(${storeVar},${hostVar},${generationVar})&&${storeVar}.set(${statusAtomVar},${hostVar},${notificationParamsVar})});` +
       `if(!${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(${hostVar})){${isCurrentFn}(${storeVar},${hostVar},${generationVar})&&${storeVar}.set(${statusAtomVar},${hostVar},{status:\`disabled\`,available:!1,accessRequired:!1});return}` +
@@ -1379,7 +1385,7 @@ function applyLinuxRemoteControlStatusReadGuardPatch(source) {
     loggerVar,
   ] = helperMatch;
   const replacement =
-    `function ${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(e){return !(typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)&&typeof e==\`string\`&&e.startsWith(\`remote-ssh\`))}` +
+    `function ${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(e){return !(typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)&&typeof e==\`string\`&&(e.startsWith(\`remote-ssh\`)||e.startsWith(\`remote-control:\`)))}` +
     `function ${functionName}(${storeVar},${clientVar}){let ${hostVar}=${clientVar}.getHostId(),${generationVar}=${generationFn}(${storeVar},${hostVar}),${initialValueVar}=${storeVar}.get(${statusAtomVar},${hostVar});` +
     `${clientVar}.addNotificationCallback(\`remoteControl/status/changed\`,({params:${notificationParamsVar}})=>{${isCurrentFn}(${storeVar},${hostVar},${generationVar})&&${statusSetterFn}(${storeVar},${hostVar},${notificationParamsVar})});` +
     `if(!${REMOTE_CONTROL_STATUS_READ_GUARD_MARKER}(${hostVar})){${isCurrentFn}(${storeVar},${hostVar},${generationVar})&&${statusSetterFn}(${storeVar},${hostVar},{status:\`disabled\`,available:!1,accessRequired:!1});return}` +
@@ -1391,21 +1397,7 @@ function applyLinuxRemoteControlStatusReadGuardPatch(source) {
 function applyLinuxRemoteControlEnablementBridgePatch(source) {
   let patched = source;
 
-  if (!patched.includes(REMOTE_CONTROL_ENABLE_FOR_HOST_PARAMS_MARKER)) {
-    const enabledForHostNullParamsPattern =
-      /("set-remote-control-enabled-for-host":[A-Za-z_$][\w$]*\(\([A-Za-z_$][\w$]*,\{enabled:[A-Za-z_$][\w$]*\}\)=>[A-Za-z_$][\w$]*\.sendRequest\([A-Za-z_$][\w$]*\?`remoteControl\/enable`:`remoteControl\/disable`,)null(\)\))/u;
-    const beforeEnableForHostParamsPatch = patched;
-    patched = patched.replace(
-      enabledForHostNullParamsPattern,
-      `$1void 0/*${REMOTE_CONTROL_ENABLE_FOR_HOST_PARAMS_MARKER}*/$2`,
-    );
-    if (
-      patched === beforeEnableForHostParamsPatch &&
-      patched.includes("set-remote-control-enabled-for-host")
-    ) {
-      console.warn("WARN: Could not find remote-control enable-for-host params needle - skipping Linux remote-control host params patch");
-    }
-  }
+  patched = applyLinuxRemoteControlEnableForHostParamsPatch(patched);
 
   const markerIndex = patched.indexOf("[remote-connections/slingshot-gate-bridge]");
   if (markerIndex < 0 || patched.indexOf("set-remote-control-connections-enabled", markerIndex) < 0) {
@@ -1471,6 +1463,28 @@ function applyLinuxRemoteControlEnablementBridgePatch(source) {
   }
 
   return patched.slice(0, markerIndex) + selfAutoConnectRegion + patched.slice(markerIndex + region.length);
+}
+
+function applyLinuxRemoteControlEnableForHostParamsPatch(source) {
+  let patched = source;
+
+  if (!patched.includes(REMOTE_CONTROL_ENABLE_FOR_HOST_PARAMS_MARKER)) {
+    const enabledForHostNullParamsPattern =
+      /("set-remote-control-enabled-for-host":[A-Za-z_$][\w$]*\(\([A-Za-z_$][\w$]*,\{enabled:[A-Za-z_$][\w$]*\}\)=>[A-Za-z_$][\w$]*\.sendRequest\([A-Za-z_$][\w$]*\?`remoteControl\/enable`:`remoteControl\/disable`,)null(\)\))/u;
+    const beforeEnableForHostParamsPatch = patched;
+    patched = patched.replace(
+      enabledForHostNullParamsPattern,
+      `$1void 0/*${REMOTE_CONTROL_ENABLE_FOR_HOST_PARAMS_MARKER}*/$2`,
+    );
+    if (
+      patched === beforeEnableForHostParamsPatch &&
+      patched.includes("set-remote-control-enabled-for-host")
+    ) {
+      console.warn("WARN: Could not find remote-control enable-for-host params needle - skipping Linux remote-control host params patch");
+    }
+  }
+
+  return patched;
 }
 
 function applyLinuxRemoteMobileActiveStatusPatch(source) {
@@ -1671,12 +1685,22 @@ module.exports = [
   {
     id: "linux-remote-control-status-read-guard",
     phase: "webview-asset",
-    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~).*\.js$/,
+    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~(?:new-thread-panel-page~o~|pull-requests-page~plug~)).*\.js$/,
     order: 20_151,
     ciPolicy: "optional",
     missingDescription: "app-server manager signals bundle",
     skipDescription: "Linux remote-control status read guard patch",
     apply: applyLinuxRemoteControlStatusReadGuardPatch,
+  },
+  {
+    id: "linux-remote-control-enable-for-host-params",
+    phase: "webview-asset",
+    pattern: /^(?:app-main|app-initial~app-main~automations-page)-.*\.js$/,
+    order: 20_154,
+    ciPolicy: "optional",
+    missingDescription: "app main remote-control host toggle bundle",
+    skipDescription: "Linux remote-control host toggle params patch",
+    apply: applyLinuxRemoteControlEnableForHostParamsPatch,
   },
   {
     id: "linux-remote-control-enablement-bridge",
@@ -1717,6 +1741,8 @@ module.exports.applyLinuxRemoteMobileChromeBridgePatch = applyLinuxRemoteMobileC
 module.exports.applyLinuxRemoteMobileConversationHydrationPatch = applyLinuxRemoteMobileConversationHydrationPatch;
 module.exports.applyLinuxRemoteControlStatusReadGuardPatch = applyLinuxRemoteControlStatusReadGuardPatch;
 module.exports.applyLinuxRemoteControlEnablementBridgePatch = applyLinuxRemoteControlEnablementBridgePatch;
+module.exports.applyLinuxRemoteControlEnableForHostParamsPatch =
+  applyLinuxRemoteControlEnableForHostParamsPatch;
 module.exports.applyLinuxRemoteMobileActiveStatusPatch = applyLinuxRemoteMobileActiveStatusPatch;
 module.exports.applyLinuxRemoteControlPreserveConfigPatch = applyLinuxRemoteControlPreserveConfigPatch;
 module.exports.applyLinuxRemoteControlClientAccountCompatibilityPatch =
