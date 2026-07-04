@@ -18,6 +18,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   descriptor exports, the unsuffixed `extracted-app` phase, and
   `patch-linux-window-ui.js` module exports.
 
+### Fixed
+
+- Updated optional Linux feature patch discovery for the current Electron 42
+  Rolldown asset layout, including authenticated proxy requests, AppShots,
+  remote control UI, conversation dictation, frameless controls, and Agent
+  Workspaces settings. Added a patch-report eval that requires all ten drifted
+  descriptors to apply cleanly or be recognized as already applied.
+
 ## [0.8.4] - 2026-06-20
 
 ### Added

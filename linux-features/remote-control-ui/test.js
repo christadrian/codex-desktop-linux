@@ -103,6 +103,8 @@ test("remote-control UI feature patches are idempotent and fail soft", () => {
     "function d(){let e=(0,u.c)(3),{data:i}=n(s,r(t)),a=c(`4114442250`);if(i?.config[`features.remote_connections`]===!0)return!0;let o=i?.config.features;if(typeof o!=`object`||!o||Array.isArray(o))return a;let l;return e[0]!==o||e[1]!==a?(l=Object.getOwnPropertyDescriptor(o,`remote_connections`)?.value===!0||a,e[0]=o,e[1]=a,e[2]=l):l=e[2],l}";
   const currentRemoteControlConnectionsSource =
     "function a({remoteControlConnectionsState:e,slingshotEnabled:t}){return t&&(e?.available??!0)&&e?.accessRequired!==!0}";
+  const currentRemoteConnectionsUngatedSource =
+    "function d(){let e=(0,u.c)(3),{data:i}=n(s,r(t));if(i?.config[`features.remote_connections`]===!0)return!0;let o=i?.config.features;if(typeof o!=`object`||!o||Array.isArray(o))return!0;let l;return e[0]!==o?(l=Object.getOwnPropertyDescriptor(o,`remote_connections`)?.value===!0,e[0]=o,e[1]=l):l=e[1],l}";
   const currentAppMainSource =
     "function m_(){let e=(0,Z.c)(14),t=Pg(),{data:n,isLoading:r}=Ps(d.CODEX_MOBILE_SETUP_COMPLETED),i=Ql(),a=ec(`2798711298`),[o]=ts(`local_app_server_feature_enablement`),[s,c]=gt(Vg),l=o?.remote_control??!1,u=t&&i&&a&&!l&&!r&&!n&&!s;return u}";
   const currentNuxGateSource =
@@ -117,6 +119,11 @@ test("remote-control UI feature patches are idempotent and fail soft", () => {
   const currentRemoteConnectionsPatched = remoteConnectionsPatch.apply(currentRemoteConnectionsSource, {});
   assert.match(currentRemoteConnectionsPatched, /c\(`4114442250`\)\|\|navigator\.userAgent\.includes\(`Linux`\)/);
   assert.equal(remoteConnectionsPatch.apply(currentRemoteConnectionsPatched, {}), currentRemoteConnectionsPatched);
+
+  assert.equal(
+    remoteConnectionsPatch.apply(currentRemoteConnectionsUngatedSource, {}),
+    currentRemoteConnectionsUngatedSource,
+  );
 
   const currentRemoteControlConnectionsPatched = remoteControlConnectionsPatch.apply(currentRemoteControlConnectionsSource, {});
   assert.match(currentRemoteControlConnectionsPatched, /\(t\|\|navigator\.userAgent\.includes\(`Linux`\)\)&&\(e\?\.available\?\?!0\)/);
@@ -138,7 +145,14 @@ test("remote-control UI feature patches are idempotent and fail soft", () => {
 
   const { value, warnings } = captureWarns(() => remoteConnectionsPatch.apply("real codex bundle", {}));
   assert.equal(value, "real codex bundle");
-  assert.match(warnings.join("\n"), /Could not find remote connections Statsig gate/);
+  assert.deepEqual(warnings, []);
+
+  const driftedGate = "function d(){return statsig.check(`4114442250`, extra)}";
+  const { value: driftValue, warnings: driftWarnings } = captureWarns(() =>
+    remoteConnectionsPatch.apply(driftedGate, {}),
+  );
+  assert.equal(driftValue, driftedGate);
+  assert.match(driftWarnings.join("\n"), /Could not find remote connections Statsig gate/);
 });
 
 test("remote-control UI feature patches matching webview assets and records patch report entries", () => {

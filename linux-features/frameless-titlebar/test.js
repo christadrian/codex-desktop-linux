@@ -64,6 +64,7 @@ test("frameless-titlebar removes Linux overlay controls and menu chrome", () => 
     "setWindowZoom(e,t){let n=r.BrowserWindow.fromWebContents(e);n==null||this.windowAppearances.get(n.id)!==`primary`||(process.platform===`darwin`?n.setWindowButtonPosition(f6(t)):(process.platform===`win32`||process.platform===`linux`)&&(this.windowZooms.set(n.id,t),n.setTitleBarOverlay(b2(t))))}",
     "installWindowsTitleBarOverlaySync(e,t){if((process.platform!==`win32`&&process.platform!==`linux`)||t!==`primary`)return;let n=()=>{e.isDestroyed()||e.setTitleBarOverlay(process.platform===`linux`?codexLinuxTitleBarOverlay(this.windowZooms.get(e.id)):b2(this.windowZooms.get(e.id)))};return a.nativeTheme.on(`updated`,n),n(),()=>{a.nativeTheme.off(`updated`,n)}}",
     "process.platform===`linux`&&k.setMenuBarVisibility(!1),process.platform===`win32`&&k.removeMenu(),",
+    "a.Menu.setApplicationMenu(yt),",
   ].join("");
 
   const patched = applyPatchTwice(applyFramelessTitlebarMainPatch, source);
@@ -79,6 +80,10 @@ test("frameless-titlebar removes Linux overlay controls and menu chrome", () => 
     /process\.platform===`linux`&&k\.removeMenu\(\),process\.platform===`win32`&&k\.removeMenu\(\),/,
   );
   assert.doesNotMatch(patched, /setMenuBarVisibility/);
+  assert.match(
+    patched,
+    /process\.platform===`linux`\?a\.Menu\.setApplicationMenu\(null\):a\.Menu\.setApplicationMenu\(yt\),/,
+  );
   assert.doesNotMatch(patched, /titleBarOverlay:codexLinuxTitleBarOverlay/);
   assert.doesNotMatch(patched, /process\.platform===`linux`[^;]*setTitleBarOverlay/);
   assert.doesNotMatch(patched, /process\.platform!==`linux`[^;]*setTitleBarOverlay/);

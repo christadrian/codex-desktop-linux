@@ -191,6 +191,9 @@ function applyWorkspaceRootOpenTargetsPatch(currentSource, targets) {
   if (targets.length === 0) {
     return currentSource;
   }
+  if (currentSource.includes("function codexLinuxOpenTargetRegistryTargets(")) {
+    return currentSource;
+  }
 
   const openCallPattern = /([A-Za-z_$][\w$]*)\(\{path:([A-Za-z_$][\w$]*),cwd:([A-Za-z_$][\w$]*),target:`fileManager`,openFile:([A-Za-z_$][\w$]*)\.mutate\}\)/gu;
   const edits = [];
@@ -290,6 +293,9 @@ function patchWorkspaceRootOpenTargets(extractedDir) {
   }
 
   const mainSource = fs.readFileSync(path.join(main.buildDir, main.mainBundle), "utf8");
+  if (mainSource.includes("function codexLinuxOpenTargetRegistryTargets(")) {
+    return { matched: 0, changed: 0 };
+  }
   const targets = enabledWorkspaceRootTargets(mainSource);
   if (targets.length === 0) {
     return {

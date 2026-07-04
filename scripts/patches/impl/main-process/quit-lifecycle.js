@@ -90,13 +90,17 @@ function applyLinuxExplicitQuitPromptBypassPatch(currentSource) {
 
   const promptBypassExpression =
     "(typeof codexLinuxShouldBypassQuitPrompt===`function`&&codexLinuxShouldBypassQuitPrompt())||";
+  const canQuitExpression = (quitControllerVar) =>
+    `(typeof ${quitControllerVar}.canQuitWithoutPrompt===\`function\`&&${quitControllerVar}.canQuitWithoutPrompt())`;
+  const markQuitApprovedExpression = (quitControllerVar) =>
+    `typeof ${quitControllerVar}.markQuitApproved===\`function\`&&${quitControllerVar}.markQuitApproved()`;
   const promptBypassGuard = `if(${promptBypassExpression}`;
   const quitMarkerExpression =
     "process.platform===`linux`&&typeof codexLinuxMarkQuitInProgress===`function`&&codexLinuxMarkQuitInProgress(),";
   const beforeQuitNeedle =
     "if(e||i.canQuitWithoutPrompt()||r||!s&&!c){g=!0,a.markAppQuitting();return}";
   const beforeQuitPatch =
-    `if(${promptBypassExpression}e||i.canQuitWithoutPrompt()||r||!s&&!c){${quitMarkerExpression}g=!0,a.markAppQuitting();return}`;
+    `if(${promptBypassExpression}e||${canQuitExpression("i")}||r||!s&&!c){${quitMarkerExpression}g=!0,a.markAppQuitting();return}`;
   const beforeQuitRegex =
     /if\(([A-Za-z_$][\w$]*)\|\|([A-Za-z_$][\w$]*)\.canQuitWithoutPrompt\(\)\|\|([A-Za-z_$][\w$]*)\|\|!([A-Za-z_$][\w$]*)&&!([A-Za-z_$][\w$]*)\)\{([A-Za-z_$][\w$]*)=!0,([A-Za-z_$][\w$]*)\.markAppQuitting\(\);return\}/g;
   const patchedBeforeQuitWithoutMarkerRegex =
@@ -114,14 +118,14 @@ function applyLinuxExplicitQuitPromptBypassPatch(currentSource) {
     beforeQuitRegex,
     (_match, updateInstallVar, quitControllerVar, appQuittingVar, activeConversationVar, automationVar, quittingStateVar, appQuittingControllerVar) => {
       patchedAny = true;
-      return `if(${promptBypassExpression}${updateInstallVar}||${quitControllerVar}.canQuitWithoutPrompt()||${appQuittingVar}||!${activeConversationVar}&&!${automationVar}){${quitMarkerExpression}${quittingStateVar}=!0,${appQuittingControllerVar}.markAppQuitting();return}`;
+      return `if(${promptBypassExpression}${updateInstallVar}||${canQuitExpression(quitControllerVar)}||${appQuittingVar}||!${activeConversationVar}&&!${automationVar}){${quitMarkerExpression}${quittingStateVar}=!0,${appQuittingControllerVar}.markAppQuitting();return}`;
     },
   );
   patchedSource = patchedSource.replace(
     patchedBeforeQuitWithoutMarkerRegex,
     (_match, updateInstallVar, quitControllerVar, appQuittingVar, activeConversationVar, automationVar, quittingStateVar, appQuittingControllerVar) => {
       patchedAny = true;
-      return `if(${promptBypassExpression}${updateInstallVar}||${quitControllerVar}.canQuitWithoutPrompt()||${appQuittingVar}||!${activeConversationVar}&&!${automationVar}){${quitMarkerExpression}${quittingStateVar}=!0,${appQuittingControllerVar}.markAppQuitting();return}`;
+      return `if(${promptBypassExpression}${updateInstallVar}||${canQuitExpression(quitControllerVar)}||${appQuittingVar}||!${activeConversationVar}&&!${automationVar}){${quitMarkerExpression}${quittingStateVar}=!0,${appQuittingControllerVar}.markAppQuitting();return}`;
     },
   );
   patchedSource = patchedSource.replace(
@@ -132,7 +136,7 @@ function applyLinuxExplicitQuitPromptBypassPatch(currentSource) {
         return match;
       }
       patchedAny = true;
-      return `${quitMarkerExpression}${quitControllerVar}.markQuitApproved(),${quittingStateVar}=!0,${appQuittingControllerVar}.markAppQuitting()`;
+      return `${quitMarkerExpression}${markQuitApprovedExpression(quitControllerVar)},${quittingStateVar}=!0,${appQuittingControllerVar}.markAppQuitting()`;
     },
   );
 

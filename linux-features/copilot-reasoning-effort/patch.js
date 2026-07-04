@@ -88,7 +88,7 @@ function applyCopilotReasoningEffortModelListPatch(currentSource) {
     /([A-Za-z_$][\w$]*)===`copilot`\?\[([A-Za-z_$][\w$]*)\.supportedReasoningEfforts\.find\([^)]*\)\?\?\{reasoningEffort:`medium`,description:`medium effort`\}\]:\[\.\.\.\2\.supportedReasoningEfforts\]/g;
 
   if (!copilotReasoningFilterRegex.test(currentSource)) {
-    if (currentSource.includes("reasoningEffort:`medium`") && currentSource.includes("supportedReasoningEfforts")) {
+    if (currentSource.includes("reasoningEffort:`medium`") && currentSource.includes("supportedReasoningEfforts") && !currentSource.includes("serviceTier")) {
       console.warn(
         "WARN: Could not find Copilot model reasoning effort filter - skipping Copilot reasoning effort model list patch",
       );
@@ -149,7 +149,7 @@ module.exports = {
       id: "settings",
       name: "copilot-reasoning-effort-settings",
       phase: "webview-asset",
-      pattern: /^(use-model-settings|use-collaboration-mode)-.*\.js$/,
+      pattern: /^(use-model-settings|use-collaboration-mode|app-initial~app-main~onboarding-page)-.*\.js$/,
       missingDescription: "model settings bundle",
       skipDescription: "Copilot reasoning effort settings patch",
       apply: applyCopilotReasoningEffortSettingsPatch,
@@ -158,7 +158,7 @@ module.exports = {
       id: "model-list",
       name: "copilot-reasoning-effort-model-list",
       phase: "webview-asset",
-      pattern: /^(font-settings|model-queries)-.*\.js$/,
+      pattern: /^(font-settings|model-queries|app-initial~app-main~onboarding-page)-.*\.js$/,
       missingDescription: "font settings bundle",
       skipDescription: "Copilot reasoning effort model list patch",
       apply: applyCopilotReasoningEffortModelListPatch,

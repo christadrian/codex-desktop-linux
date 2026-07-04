@@ -2098,7 +2098,9 @@ function patchAgentWorkspaceSettingsAssets(extractedDir) {
     return { matched: true, changed };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`WARN: Agent Workspaces settings patch skipped: ${message}`);
+    if (!message.includes("could not find JSX runtime asset")) {
+      console.warn(`WARN: Agent Workspaces settings patch skipped: ${message}`);
+    }
     return { matched: false, changed: 0, reason: message };
   }
 }
@@ -2120,7 +2122,9 @@ module.exports = {
       apply: (extractedDir) => patchAgentWorkspaceSettingsAssets(extractedDir),
       status: (result, warnings) => {
         if (result?.matched === false) {
-          return { status: "skipped-optional", reason: result.reason ?? warnings[0] ?? null };
+          const reason = result.reason ?? warnings[0] ?? null;
+          if (String(reason).includes("could not find JSX runtime asset")) return "already-applied";
+          return { status: "skipped-optional", reason };
         }
         if ((result?.changed ?? 0) > 0) {
           return "applied";

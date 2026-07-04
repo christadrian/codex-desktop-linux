@@ -688,6 +688,16 @@ test("remote mobile cold-start hook preserves live standalone daemon pid files w
   }
 });
 
+
+test("remote mobile copy patch targets current settings and setup chunks", () => {
+  withTempFeatureRoot(["remote-mobile-control"], (root) => {
+    const descriptor = loadLinuxFeaturePatchDescriptors({ featuresRoot: root })
+      .find((descriptor) => descriptor.id === "feature:remote-mobile-control:linux-remote-control-copy");
+    assert.equal(descriptor.pattern.test("settings-page-Czsl4aZl.js"), true);
+    assert.equal(descriptor.pattern.test("codex-mobile-setup-dialog-BIUrpc8k.js"), true);
+  });
+});
+
 test("remote mobile control feature exposes opt-in main-bundle and webview patches", () => {
   withTempFeatureRoot(["remote-mobile-control"], (root) => {
     const descriptors = loadLinuxFeaturePatchDescriptors({ featuresRoot: root });
@@ -747,6 +757,7 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
       descriptor.id === "feature:remote-mobile-control:linux-remote-control-status-read-guard"
     );
     assert.ok(statusGuardDescriptor);
+    assert.equal(statusGuardDescriptor.pattern.test("thread-context-inputs-fixture.js"), true);
     assert.equal(
       statusGuardDescriptor.pattern.test(
         "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~pull-requests-page~plug~kmtatxxf-IUI8plS9.js",
@@ -968,6 +979,14 @@ test("Linux remote-control load gate enables remote-control environment loading"
   assert.match(patched, /navigator\.userAgent\.includes\(`Linux`\)/);
   assert.match(patched, /return codexLinuxRemoteControlLoadGateEnabled\(\)\|\|c\(`1042620455`\)/);
   assert.equal(applyLinuxRemoteControlLoadGatePatch(patched), patched);
+});
+
+test("Linux remote-control load gate ignores unrelated Statsig gates", () => {
+  const source = "function x(){return gate(`1042620455`)&&other()}";
+  const { result, warnings } = captureWarnings(() => applyLinuxRemoteControlLoadGatePatch(source));
+
+  assert.equal(result, source);
+  assert.deepEqual(warnings, []);
 });
 
 test("Linux remote-control feature sync forces remote_control and preserves remote_plugin on Linux", () => {
@@ -1774,6 +1793,14 @@ test("Linux remote mobile conversation hydration patch warns when only part of t
   assert.notEqual(result, source);
   assert.match(result, /codexLinuxRemoteMobileHydrateUnknownTurn/);
   assert.ok(warnings.some((warning) => warning.includes("unknown turn/completed needle")));
+});
+
+test("Linux remote mobile hydration ignores unrelated runtime status summaries", () => {
+  const source = "let e={resumeState:`needs_resume`,threadRuntimeStatus:t(St,e)??n?.threadRuntimeStatus};";
+  const { result, warnings } = captureWarnings(() => applyLinuxRemoteMobileConversationHydrationPatch(source));
+
+  assert.equal(result, source);
+  assert.deepEqual(warnings, []);
 });
 
 test("Linux remote-control status guard skips slow remote SSH status reads", async () => {

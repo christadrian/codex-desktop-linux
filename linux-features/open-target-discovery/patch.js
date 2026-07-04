@@ -579,6 +579,16 @@ function applyOpenInTargetsAvailabilityPatch(currentSource) {
     /async function ([A-Za-z_$][\w$]*)\(e,t\)\{let n=await Promise\.all\(rP\(e\)\.map\(async n=>\{let r=iP\(e,n\.id\),\[i,a\]=await Promise\.all\(\[t\(\{method:`get-target-command`,params:r\}\)\.then\(e=>e\.command\)\.catch\(e=>\(tP\(\)\.error\(`Failed to detect open target`,\{safe:\{\},sensitive:\{id:n\.id,error:e\}\}\),null\)\),process\.platform===`win32`\?t\(\{method:`load-target-icon`,params:r\}\)\.then\(e=>e\.icon\)\.catch\(e=>\(tP\(\)\.warning\(`Failed to resolve open target icon`,\{safe:\{\},sensitive:\{id:n\.id,error:e\}\}\),n\.icon\)\):n\.icon\]\);return\{command:i,metadata:\{\.\.\.n,icon:a\}\}\}\)\);return\{allAvailableTargets:n\.flatMap\(\(\{command:e,metadata:t\}\)=>e==null\?\[\]:\[t\.id\]\),targetMetadata:n\.map\(\(\{metadata:e\}\)=>e\)\}\}/u,
   );
   if (match == null) {
+    const currentMatch = currentSource.match(
+      /async function ([A-Za-z_$][\w$]*)\(e,t\)\{let n=await Promise\.all\(([A-Za-z_$][\w$]*)\(e\)\.map\(async n=>\{let r=([A-Za-z_$][\w$]*)\(e,n\.id\),\[i,a\]=await Promise\.all\(\[t\(\{method:`get-target-command`,params:r\}\)\.then\(e=>e\.command\)\.catch\(e=>\(([A-Za-z_$][\w$]*)\(\)\.error\(`Failed to detect open target`,\{safe:\{\},sensitive:\{id:n\.id,error:e\}\}\),null\)\),process\.platform===`win32`\?t\(\{method:`load-target-icon`,params:r\}\)\.then\(e=>e\.icon\)\.catch\(e=>\(\4\(\)\.warning\(`Failed to resolve open target icon`,\{safe:\{\},sensitive:\{id:n\.id,error:e\}\}\),n\.icon\)\):n\.icon\]\);return\{command:i,metadata:\{\.\.\.n,icon:a\}\}\}\)\);return\{allAvailableTargets:n\.flatMap\(\(\{command:e,metadata:t\}\)=>e==null\?\[\]:\[t\.id\]\),targetMetadata:n\.map\(\(\{metadata:e\}\)=>e\)\}\}/u,
+    );
+    if (currentMatch != null) {
+      const [needle, fnName, targetsFn, paramsFn, loggerFn] = currentMatch;
+      return currentSource.replace(
+        needle,
+        `async function ${fnName}(e,t){let n=await Promise.all(${targetsFn}(e).map(async n=>{let r=${paramsFn}(e,n.id),[i,a]=await Promise.all([process.platform===\`linux\`?codexLinuxOpenTargetRegistryCommand(e,n.id):t({method:\`get-target-command\`,params:r}).then(e=>e.command).catch(e=>(${loggerFn}().error(\`Failed to detect open target\`,{safe:{},sensitive:{id:n.id,error:e}}),null)),process.platform===\`win32\`?t({method:\`load-target-icon\`,params:r}).then(e=>e.icon).catch(e=>(${loggerFn}().warning(\`Failed to resolve open target icon\`,{safe:{},sensitive:{id:n.id,error:e}}),n.icon)):n.icon]);return{command:i,metadata:{...n,icon:a}}}));return{allAvailableTargets:n.flatMap(({command:e,metadata:t})=>e==null?[]:[t.id]),targetMetadata:n.map(({metadata:e})=>e)}}`,
+      );
+    }
     if (currentSource.includes("async function") && currentSource.includes("get-target-command") && currentSource.includes("allAvailableTargets")) {
       warn("Could not find open-in-targets availability detector");
     }
@@ -642,6 +652,10 @@ function applyOpenInTargetsDirectoryModePatch(currentSource) {
     {
       needle: "g=d||f!=null&&t.rs(f),_=f!=null&&cj(f),v=f!=null&&uj(f),y=g?await MF(i):_?await jF({filePath:f}):[]",
       replacement: "w=f!=null&&codexLinuxOpenTargetIsDirectory(f),g=d||w||f!=null&&t.rs(f),_=f!=null&&cj(f),v=f!=null&&uj(f),y=g?await MF(i):_?await jF({filePath:f}):[]",
+    },
+    {
+      needle: "g=d||f!=null&&t.is(f),_=f!=null&&aj(f),v=f!=null&&sj(f),y=g?await kF(i):_?await OF({filePath:f}):[]",
+      replacement: "w=f!=null&&codexLinuxOpenTargetIsDirectory(f),g=d||w||f!=null&&t.is(f),_=f!=null&&aj(f),v=f!=null&&sj(f),y=g?await kF(i):_?await OF({filePath:f}):[]",
     },
   ];
 

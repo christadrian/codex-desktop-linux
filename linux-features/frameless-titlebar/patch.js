@@ -77,6 +77,14 @@ function applyFramelessTitlebarOverlaySyncPatch(currentSource) {
 }
 
 function applyFramelessTitlebarMenuPatch(currentSource) {
+  currentSource = currentSource.replace(
+    /([A-Za-z_$][\w$]*)\.Menu\.setApplicationMenu\(([A-Za-z_$][\w$]*)\),/g,
+    (match, electronAlias, menuAlias) => {
+      const patched = `process.platform===\`linux\`?${electronAlias}.Menu.setApplicationMenu(null):${electronAlias}.Menu.setApplicationMenu(${menuAlias}),`;
+      return currentSource.includes(patched) ? match : patched;
+    },
+  );
+
   const menuRegex = /process\.platform===`win32`&&([A-Za-z_$][\w$]*)\.removeMenu\(\),/g;
   let patchedSource = currentSource
     .replace(
@@ -160,7 +168,7 @@ const patches = [
     phase: "webview-asset",
     order: 20_730,
     ciPolicy: "optional",
-    pattern: /^use-window-controls-safe-area-.*\.js$/,
+    pattern: /^(?:use-window-controls-safe-area|hotkey-window-detail-layout)-.*\.js$/,
     missingDescription: "window controls safe-area bundle",
     skipDescription: "frameless titlebar webview layout patch",
     apply: applyFramelessTitlebarWebviewPatch,

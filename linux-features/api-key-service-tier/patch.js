@@ -9,6 +9,11 @@ function warn(message, patchName) {
 }
 
 function applyApiKeyServiceTierGatePatch(source) {
+  source = source.replace(
+    /async function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{let ([A-Za-z_$][\w$]*)=await ([A-Za-z_$][\w$]*)\(\2,\3\);return \4===`chatgpt`\?\(await ([A-Za-z_$][\w$]*)\.query\.fetch\(([A-Za-z_$][\w$]*),\{authMethod:\4,hostId:\3\}\)\)\.requirements\?\.featureRequirements\?\.fast_mode!==!1:!1\}/g,
+    "async function $1($2,$3){let $4=await $5($2,$3);return $4===`apikey`?!0:$4===`chatgpt`?(await $6.query.fetch($7,{authMethod:$4,hostId:$3})).requirements?.featureRequirements?.fast_mode!==!1:!1}",
+  );
+
   const gateNeedle = new RegExp(
     `(${JS_IDENT})=(${JS_IDENT})\\?\\.authMethod===\\\`chatgpt\\\`,` +
       `(${JS_IDENT})=\\2\\?\\.authMethod\\?\\?null([\\s\\S]{0,500}?),` +
@@ -24,7 +29,13 @@ function applyApiKeyServiceTierGatePatch(source) {
       `d=!${loadingVar}&&(${isChatGptVar}?${requirementsVar}!=null&&${requirementsVar}?.requirements?.featureRequirements?.fast_mode!==!1:${authMethodVar}===\`apikey\`)`,
   );
 
-  if (patched !== source || source.includes(`${authMethodVarName(source)}===\`apikey\``)) {
+  if (
+    patched !== source ||
+    source.includes(`${authMethodVarName(source)}===\`apikey\``) ||
+    /[A-Za-z_$][\w$]*=!+[A-Za-z_$][\w$]*&&\([A-Za-z_$][\w$]*\?[^;]+:[A-Za-z_$][\w$]*===`apikey`\)/.test(source) ||
+    source.includes("===`apikey`?!0") ||
+    source.includes(PATCH_MARKER)
+  ) {
     return patched;
   }
 
@@ -60,7 +71,7 @@ function applyApiKeyModelMarkerPatch(source) {
     return patched;
   }
 
-  if (source.includes("list-models-for-host") && source.includes("supportedReasoningEfforts")) {
+  if (/function [A-Za-z_$][\w$]*\(\{authMethod:[A-Za-z_$][\w$]*,availableModels:[A-Za-z_$][\w$]*,defaultModel:[A-Za-z_$][\w$]*,enabledReasoningEfforts:[A-Za-z_$][\w$]*,includeUltraReasoningEffort:[A-Za-z_$][\w$]*,models:[A-Za-z_$][\w$]*,useHiddenModels:[A-Za-z_$][\w$]*\}\)/.test(source)) {
     warn("Could not find model list mapping", "API key model service tier marker patch");
   }
   return source;

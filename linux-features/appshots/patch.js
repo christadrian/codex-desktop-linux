@@ -15,6 +15,14 @@ function warn(message, patchName) {
 }
 
 function applyLinuxAppshotAvailabilityPatch(currentSource) {
+  currentSource = currentSource.replace(
+    /appshotsEnabled:([A-Za-z_$][\w$]*),/g,
+    (match, enabledAlias) => {
+      const patched = `appshotsEnabled:typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)?!0:${enabledAlias},`;
+      return currentSource.includes(patched) ? match : patched;
+    },
+  );
+
   if (currentSource.includes("!==`linux`&&(") && currentSource.includes("!==`macOS`||")) {
     return currentSource;
   }
@@ -32,7 +40,7 @@ function applyLinuxAppshotAvailabilityPatch(currentSource) {
     return patchedSource;
   }
 
-  if (currentSource.includes("macOS") || currentSource.includes("appshot")) {
+  if (currentSource.includes("!==`macOS`") && currentSource.includes("appshotsEnabled")) {
     warn("Could not find AppShots availability gate", "Linux AppShots availability patch");
   }
   return currentSource;
@@ -198,7 +206,7 @@ function applyLinuxAppshotSettingsHotkeyPatch(currentSource) {
   let changed = false;
   let optionsVarName = null;
   let patchedSource = currentSource.replace(
-    /((?:var\s+|,)([A-Za-z_$][\w$]*)=)(\[\{hotkey:`DoubleCommand`,label:`[^`]+`\},\{hotkey:`DoubleOption`,label:`[^`]+`\},\{hotkey:`DoubleShift`,label:`[^`]+`\}\])(?=;)/,
+    /((?:var\s+|,)([A-Za-z_$][\w$]*)=)(\[\{hotkey:`DoubleCommand`,label:`[^`]+`\},\{hotkey:`DoubleOption`,label:`[^`]+`\},\{hotkey:`DoubleShift`,label:`[^`]+`\}\])(?=[;}]|\)])/,
     (match, declarationPrefix, optionsVar, macOptions) => {
       changed = true;
       optionsVarName = optionsVar;
@@ -314,7 +322,7 @@ const descriptors = [
     id: "linux-appshots-availability",
     phase: "webview-asset",
     order: 1090,
-    pattern: /^appshot-availability-.*\.js$/,
+    pattern: /^(?:appshot-availability|app-initial~app-main~automations-page)-.*\.js$/,
     missingDescription: "AppShots availability bundle",
     skipDescription: "Linux AppShots availability patch",
     apply: applyLinuxAppshotAvailabilityPatch,
@@ -329,7 +337,7 @@ const descriptors = [
     id: "linux-appshots-settings-hotkey",
     phase: "webview-asset",
     order: 1091,
-    pattern: /^appshots-settings-.*\.js$/,
+    pattern: /^(?:appshots-settings|settings-page)-.*\.js$/,
     missingDescription: "AppShots settings bundle",
     skipDescription: "Linux AppShots settings hotkey patch",
     apply: applyLinuxAppshotSettingsHotkeyPatch,

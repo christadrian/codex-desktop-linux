@@ -16,6 +16,7 @@ const LINUX_SAFE_MONOSPACE_FONT_STACK =
   "\"Noto Sans Mono\", \"DejaVu Sans Mono\", \"Liberation Mono\", \"Ubuntu Mono\", ui-monospace, \"SFMono-Regular\", \"SF Mono\", Menlo, Consolas, monospace";
 const LINUX_TOOLTIP_COLLISION_PADDING_TOP = 44;
 const LINUX_WINDOW_CONTROLS_SAFE_AREA_RIGHT = 138;
+const JS_IDENTIFIER = "[A-Za-z_$][\\w$]*";
 
 function applyLinuxSafeMonospaceFontStackPatch(currentSource) {
   const safeLinuxMonoFontPattern =
@@ -1884,6 +1885,38 @@ function applyLinuxSkillsListDedupePatch(currentSource) {
     .replace("function IJ(e){return e.skills}", `${helper}function IJ(e){return e.skills}`);
 }
 
+function applyLinuxApplyPatchPolicyPatch(currentSource) {
+  if (currentSource.includes("function codexLinuxApplyPatchPolicy(")) {
+    return currentSource;
+  }
+
+  const policy =
+    "For manual file edits, file creation, file deletion, and small targeted changes, use apply_patch. Do not use shell redirection, heredocs, Python/Node file writes, sed -i, perl -pi, tee, or cat > for hand-authored edits. Use shell-based generation only for generated files, formatter output, broad mechanical rewrites, or when apply_patch fails.";
+  const helper =
+    `function codexLinuxApplyPatchPolicy(e){let t=${JSON.stringify(policy)};return typeof e==\`string\`&&e.includes(t)?e:e==null||String(e).trim()===\`\`?t:String(e).trim()+\`\\n\\n\`+t}`;
+  const fieldNeedle = "baseInstructions:c?.baseInstructions??null";
+  const fieldPatch = "baseInstructions:codexLinuxApplyPatchPolicy(c?.baseInstructions??null)";
+  if (currentSource.includes(fieldNeedle) || currentSource.includes(fieldPatch)) {
+    const targetNeedle = currentSource.includes(fieldNeedle) ? fieldNeedle : fieldPatch;
+    const functionMatch = currentSource.match(new RegExp(`async function ${JS_IDENTIFIER}\\([^)]*approvalsReviewer[^)]*\\)\\{[\\s\\S]{0,1600}?${escapeRegExp(targetNeedle)}`));
+    const functionNeedle = functionMatch?.[0].match(/async function [A-Za-z_$][\w$]*\(/)?.[0];
+    if (functionNeedle == null) return currentSource;
+    return currentSource
+      .replace(fieldNeedle, fieldPatch)
+      .replace(functionNeedle, `${helper}${functionNeedle}`);
+  }
+
+  const startRequestMatch = currentSource.match(/function ([A-Za-z_$][\w$]*)\(\{[\s\S]{0,700}?baseInstructions:([A-Za-z_$][\w$]*)[\s\S]{0,1800}?,baseInstructions:\2,additionalDeveloperInstructions:/);
+  if (startRequestMatch != null) {
+    const [match, functionName, instructionsVar] = startRequestMatch;
+    return currentSource
+      .replace(`function ${functionName}(`, `${helper}function ${functionName}(`)
+      .replace(match, match.replace(`,baseInstructions:${instructionsVar},additionalDeveloperInstructions:`, `,baseInstructions:codexLinuxApplyPatchPolicy(${instructionsVar}),additionalDeveloperInstructions:`));
+  }
+
+  return currentSource;
+}
+
 function patchCommentPreloadBundle(extractedDir) {
   const commentPreloadBundle = path.join(extractedDir, ".vite", "build", "comment-preload.js");
   if (!fs.existsSync(commentPreloadBundle)) {
@@ -1908,6 +1941,7 @@ module.exports = {
   applyLinuxCompletedItemRecoveryPatch,
   applyLinuxRemoteTerminalStatusRecoveryPatch,
   applyLinuxAppServerFeatureEnablementPatch,
+  applyLinuxApplyPatchPolicyPatch,
   applyLinuxChatSearchHydrationPatch,
   applyLinuxBrowserUseAvailabilityPatch,
   applyLinuxBrowserUseExternalAvailabilityPatch,

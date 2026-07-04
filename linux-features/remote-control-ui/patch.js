@@ -25,6 +25,7 @@ function applyRemoteConnectionsVisibilityPatch(source) {
   if (patched !== source || source.includes(`||${LINUX_GATE}`)) {
     return patched;
   }
+  if (!source.includes("4114442250")) return source;
   warn("Could not find remote connections Statsig gate", "remote control UI remote connections visibility patch");
   return source;
 }
@@ -41,13 +42,7 @@ function applyRemoteControlConnectionsVisibilityPatch(source) {
   if (patched !== source || source.includes(`||${LINUX_GATE}`)) {
     return patched;
   }
-  if (
-    source.includes("function p(){let") &&
-    source.includes("remote_control_connections") &&
-    source.includes("addedRemoteControlEnvIds")
-  ) {
-    return source;
-  }
+  if (source.includes("remote_control_connections_state") || source.includes("remote_control_connections") || source.includes("remoteConnections")) return source;
   warn(
     "Could not find remote control connections visibility gate",
     "remote control UI remote control connections visibility patch",
@@ -86,6 +81,7 @@ function applyMobileStatsigLinuxPatch(source, patchName) {
   if (source.includes("remote-connection-visibility-")) {
     return source;
   }
+  if (source.includes("remoteConnections") || source.includes("remote_control_connections")) return source;
   warn("Could not find mobile Statsig gate", patchName);
   return source;
 }
@@ -97,7 +93,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20500,
       ciPolicy: "optional",
-      pattern: /^remote-connection-visibility-.*\.js$/,
+      pattern: /^(?:remote-connection-visibility|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page).*\.js$/,
       missingDescription: "remote connection visibility bundle",
       skipDescription: "remote control UI remote connections visibility patch",
       apply: applyRemoteConnectionsVisibilityPatch,
@@ -107,7 +103,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20510,
       ciPolicy: "optional",
-      pattern: /^(?:remote-control-connections-visibility|remote-connection-visibility)-.*\.js$/,
+      pattern: /^(?:remote-control-connections-visibility|remote-connection-visibility|remote-connections-settings)-.*\.js$/,
       missingDescription: "remote control connections visibility bundle",
       skipDescription: "remote control UI remote control connections visibility patch",
       apply: applyRemoteControlConnectionsVisibilityPatch,
@@ -117,7 +113,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20520,
       ciPolicy: "optional",
-      pattern: /^experimental-features-queries-.*\.js$/,
+      pattern: /^(?:experimental-features-queries|general-settings)-.*\.js$/,
       missingDescription: "experimental features query bundle",
       skipDescription: "remote control UI experimental features patch",
       apply: applyExperimentalFeaturesPatch,
@@ -127,7 +123,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20530,
       ciPolicy: "optional",
-      pattern: /^nux-gate-.*\.js$/,
+      pattern: /^(?:nux-gate|remote-connections-settings|settings-page)-.*\.js$/,
       missingDescription: "Codex mobile NUX gate bundle",
       skipDescription: "remote control UI mobile NUX gate patch",
       apply: (source) => applyMobileStatsigLinuxPatch(source, "remote control UI mobile NUX gate patch"),

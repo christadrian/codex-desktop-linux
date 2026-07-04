@@ -378,7 +378,7 @@ function applyDictationEndpointPatch(source) {
         "$1?.codexLinuxConversationCleanup?.(),$1&&($1.ondataavailable=null,$1.onstop=null),$2.current=null,$3();",
       );
     } else {
-      warn("Could not find dictation cleanup point", "conversation mode dictation endpoint patch");
+      if (!patched.includes("global-dictation-record-history-item") && !patched.includes("new MediaRecorder")) warn("Could not find dictation cleanup point", "conversation mode dictation endpoint patch");
     }
   }
 
@@ -400,7 +400,7 @@ function applyDictationEndpointPatch(source) {
           `let ${recorderVar}=new MediaRecorder(${streamVar});if(${recorderRefVar}.current=${recorderVar},${chunksRefVar}.current=[],${recorderVar}.ondataavailable=${dataVar}=>{${dataVar}.data.size>0&&${chunksRefVar}.current.push(${dataVar}.data)},${recorderVar}.onstop=()=>{${finishFn}()},${recorderVar}.codexLinuxConversationCleanup=globalThis.codexLinuxConversationEndpoint?.({stream:${streamVar},stop:()=>{${currentActionRef}.current=\`send\`;${recorderVar}.state!==\`inactive\`&&${recorderVar}.stop()},isActive:()=>${recorderRefVar}.current===${recorderVar}&&${recorderVar}.state!==\`inactive\`}),${recorderVar}.start(),${activeSetterVar}(!0)`,
       );
     } else {
-      warn("Could not find dictation recorder start point", "conversation mode dictation endpoint patch");
+      if (!patched.includes("new MediaRecorder")) warn("Could not find dictation recorder start point", "conversation mode dictation endpoint patch");
     }
   }
 
@@ -428,7 +428,11 @@ function applyDictationEndpointPatch(source) {
         "$1.length>0&&$3!==`discard`&&globalThis.codexLinuxConversationShouldSendTranscript?.($1,$3)!==!1&&($2.getInstance().dispatchMessage(`global-dictation-record-history-item`,{text:$1}),$3===`send`?$4.onTranscriptSend($1):$4.onTranscriptInsert($1))",
       );
     } else {
-      warn("Could not find dictation transcript send point", "conversation mode transcript dedupe patch");
+      if (
+        !patched.includes("global-dictation-record-history-item") &&
+        !patched.includes("onTranscriptSend") &&
+        !patched.includes("global-dictation-completed")
+      ) warn("Could not find dictation transcript send point", "conversation mode transcript dedupe patch");
     }
   }
 
@@ -492,7 +496,7 @@ module.exports = {
       order: 20690,
       ciPolicy: "optional",
       pattern:
-        /^(?:(?:browser-sidebar-comment-light-dismiss|use-dictation(?!-hotkey))-|app-initial~app-main~.*onboarding-page).*\.js$/,
+        /^(?:(?:browser-sidebar-comment-light-dismiss|use-dictation(?!-hotkey)|global-dictation-orb)-|app-initial~app-main~.*onboarding-page).*\.js$/,
       missingDescription: "composer dictation bundle",
       skipDescription: "conversation mode dictation endpoint patch",
       apply: applyDictationEndpointPatch,

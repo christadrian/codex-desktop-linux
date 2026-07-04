@@ -77,6 +77,15 @@ test("service tier auth gate allows API-key hosts while preserving ChatGPT requi
   assert.doesNotMatch(patched, /d=a&&!u&&c!=null/);
 });
 
+
+test("service tier resolver allows API-key hosts", () => {
+  const source = "async function bAe(e,t){let n=await _Ae(e,t);return n===`chatgpt`?(await e.query.fetch(Bu,{authMethod:n,hostId:t})).requirements?.featureRequirements?.fast_mode!==!1:!1}";
+
+  const patched = applyPatchTwice(applyApiKeyServiceTierGatePatch, source);
+
+  assert.match(patched, /return n===`apikey`\?!0:n===`chatgpt`\?/);
+});
+
 test("model list entries are marked only when loaded for API-key hosts", () => {
   const source =
     "function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>Gx(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),c??=s.find(e=>e.model===n)??null,{models:s,defaultModel:c}}";

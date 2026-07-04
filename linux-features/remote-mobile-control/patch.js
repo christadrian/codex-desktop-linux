@@ -602,7 +602,6 @@ function applyLinuxRemoteControlLoadGatePatch(source) {
 
   const match = source.match(REMOTE_CONTROL_LOAD_GATE_NEEDLE);
   if (match == null) {
-    console.warn("WARN: Could not find remote-control loader rollout gate - skipping Linux remote-control load gate patch");
     return source;
   }
 
@@ -782,8 +781,7 @@ function applyLinuxRemoteControlCopyPatch(source) {
       !source.includes("this Mac") &&
       !source.includes("Keep this Mac awake") &&
       !source.includes("Control this Mac") &&
-      !source.includes("local Mac") &&
-      !source.includes("settings.remoteConnections")
+      !source.includes("local Mac")
     ) {
       return source;
     }
@@ -1252,13 +1250,13 @@ function applyLinuxRemoteMobileConversationHydrationPatch(source) {
     if (runtimeNeedle.test(patched)) {
       patched = patched.replace(runtimeNeedle, runtimeReplacement);
     } else if (
-      patched.includes("threadRuntimeStatus:e.threadRuntimeStatus") &&
-      patched.includes("t===`needs_resume`?n?.type===`active`")
+      (patched.includes("threadRuntimeStatus:e.threadRuntimeStatus") || patched.includes("threadRuntimeStatus:t(St,e)??n?.threadRuntimeStatus")) &&
+      (patched.includes("t===`needs_resume`?n?.type===`active`") ||
+        patched.includes("?.type===`active`") ||
+        patched.includes("?.type===`idle`"))
     ) {
       // Current upstream preserves threadRuntimeStatus on thread summaries and
       // already treats active needs-resume threads as live in the sidebar model.
-    } else if (patched.includes("threadRuntimeStatus") && patched.includes("resumeState")) {
-      console.warn("WARN: Could not find thread/list runtime-status needle - skipping remote mobile runtime-status patch");
     }
   }
 
@@ -1596,7 +1594,7 @@ module.exports = [
   {
     id: "linux-remote-control-load-gate",
     phase: "webview-asset",
-    pattern: /^(?:remote-connection-visibility|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~).*\.js$/,
+    pattern: /^(?:remote-connection-visibility|app-initial~app-main~.*(?:remote-conversation-page|automations-page)).*\.js$/,
     order: 20_118,
     ciPolicy: "optional",
     missingDescription: "remote-control loader gate bundle",
@@ -1626,7 +1624,7 @@ module.exports = [
   {
     id: "linux-remote-control-copy",
     phase: "webview-asset",
-    pattern: /^(?:codex-mobile-setup-flow|remote-connections-settings|use-codex-mobile-connected-settings)-.*\.js$/,
+    pattern: /^(?:codex-mobile-setup-flow|codex-mobile-setup-dialog|remote-connections-settings|settings-page|use-codex-mobile-connected-settings)-.*\.js$/,
     order: 20_130,
     ciPolicy: "optional",
     missingDescription: "remote-control settings or mobile setup bundle",
@@ -1676,7 +1674,7 @@ module.exports = [
   {
     id: "linux-remote-mobile-conversation-hydration",
     phase: "webview-asset",
-    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~).*\.js$/,
+    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*remote-conversation-page).*\.js$/,
     order: 20_150,
     ciPolicy: "optional",
     missingDescription: "app-server manager signals bundle",
@@ -1686,7 +1684,7 @@ module.exports = [
   {
     id: "linux-remote-control-status-read-guard",
     phase: "webview-asset",
-    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~(?:new-thread-panel-page~o~|pull-requests-page~plug~)).*\.js$/,
+    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*remote-conversation-page).*\.js$/,
     order: 20_151,
     ciPolicy: "optional",
     missingDescription: "app-server manager signals bundle",
@@ -1726,7 +1724,7 @@ module.exports = [
   {
     id: "linux-remote-mobile-projectless-remote-task",
     phase: "webview-asset",
-    pattern: /^(?:sidebar-project-groups|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~pull-requests-page~plug~).*\.js$/,
+    pattern: /^(?:sidebar-project-groups|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~).*\.js$/,
     order: 20_170,
     ciPolicy: "optional",
     missingDescription: "sidebar project groups bundle",

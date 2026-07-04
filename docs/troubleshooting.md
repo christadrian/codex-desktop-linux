@@ -94,6 +94,17 @@ make package
 make install
 ```
 
+For enabled optional features, score the known Electron 42 patch descriptors
+after rebuilding:
+
+```bash
+node scripts/ci/eval-current-feature-patches.js \
+  codex-app/.codex-linux/patch-report.json
+```
+
+The command exits nonzero unless every tracked descriptor is `applied` or
+`already-applied`.
+
 ## `/tmp` Mounted `noexec`
 
 Some hardened systems mount `/tmp` with `noexec`, which can prevent the Rust

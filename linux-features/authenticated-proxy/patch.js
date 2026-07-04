@@ -77,7 +77,8 @@ function applyAuthenticatedProxyPatch(currentSource) {
     patchedSource = patchedSource.replace(fetchNeedle, fetchReplacement);
   } else if (
     patchedSource.includes("performDesktopFetch") &&
-    !patchedSource.includes("!codexLinuxProxyAuthEntry()?await")
+    !patchedSource.includes("!codexLinuxProxyAuthEntry()?await") &&
+    patchedSource.includes("net.fetch")
   ) {
     console.warn(
       "WARN: Could not route Linux proxy-auth desktop fetches through ClientRequest",
@@ -92,7 +93,8 @@ function applyAuthenticatedProxyPatch(currentSource) {
     patchedSource = patchedSource.replace(requestNeedle, requestReplacement);
   } else if (
     patchedSource.includes("performProgressRequest") &&
-    !patchedSource.includes("codexLinuxAttachProxyAuthToRequest(")
+    !patchedSource.includes("codexLinuxAttachProxyAuthToRequest(") &&
+    patchedSource.includes("net.request")
   ) {
     console.warn(
       "WARN: Could not attach Linux proxy authentication to ClientRequest fetch path",

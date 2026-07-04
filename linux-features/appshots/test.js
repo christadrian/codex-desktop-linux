@@ -186,6 +186,18 @@ test("enables AppShots availability atom on Linux", () => {
   assert.match(patched, /requirements\?\.allowAppshots!==!1/);
 });
 
+test("forces AppShots desktop feature payload on Linux", () => {
+  const patched = applyPatchTwice(
+    applyLinuxAppshotAvailabilityPatch,
+    "Y.dispatchMessage(`electron-desktop-features-changed`,{ambientSuggestions:n,appshotsEnabled:r,avatarOverlayNativeStack:a})",
+  );
+
+  assert.match(
+    patched,
+    /appshotsEnabled:typeof navigator!=`undefined`&&navigator\.userAgent\.includes\(`Linux`\)\?!0:r,/,
+  );
+});
+
 test("finds only the raw renderer message sender", () => {
   assert.equal(findMessageForViewSendFunction(appshotMainProcessBundleFixture()), "rS");
   assert.equal(
