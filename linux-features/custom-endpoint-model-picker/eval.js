@@ -2,6 +2,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const vm = require("node:vm");
 const {
   descriptors,
   applyMainBundleCatalogModelsPatch,
@@ -15,15 +16,21 @@ const scenarios = [
     run() {
       const source = 'var nB=class{async getUserSavedConfiguration(e){return(await this.readConfig({includeLayers:!1,cwd:e??null})).config}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}async startThread(e){}}';
       const patched = applyMainBundleCatalogModelsPatch(source);
-      assert.match(patched, /__codexLinuxMergeCustomEndpointCatalogModels/);
+      assert.match(patched, /__codexLinuxMergeCustomEndpointCatalogModelsV3/);
+      assert.match(patched, /__cdlxCfg/);
       assert.match(patched, /getUserSavedConfiguration/);
       assert.match(patched, /model_catalog_json/);
+      new vm.Script(patched);
     },
   },
   {
     name: "current upstream bundles selected",
     run() {
       assert.match("app-initial~app-main~onboarding-page-BUwCKIcU.js", descriptors[1].pattern);
+      assert.match(
+        "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~bj5tp28r-Dcs9S3fj.js",
+        descriptors[1].pattern,
+      );
       assert.match(
         "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~bj5tp28r-Dcs9S3fj.js",
         descriptors[2].pattern,
@@ -37,6 +44,48 @@ const scenarios = [
       const patched = applyModelPickerAllowlistPatch(source);
       assert.match(patched, /l=!1,u=/);
       assert.doesNotMatch(patched, /amazonBedrock/);
+    },
+  },
+  {
+    name: "bundle randomUUID module var preserved",
+    run() {
+      const source = 'var nB=class{async listModels(e){await this.ensureReady();let t=`model/list:${(0,c.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}}';
+      const patched = applyMainBundleCatalogModelsPatch(source);
+      assert.match(patched, /\(0,c\.randomUUID\)/);
+      assert.doesNotMatch(patched, /\(0,o\.randomUUID\)/);
+      new vm.Script(patched);
+    },
+  },
+  {
+    name: "minified identifier collisions avoided",
+    run() {
+      const source = 'var nB=class{async listModels(e){await this.ensureReady();let n=`model/list:${(0,o.randomUUID)()}`,r=await this.sendInternalRequest({id:n,method:`model/list`,params:e});if(r.error)throw Error(r.error.message??`Failed to read available models`);return r.result}}';
+      const patched = applyMainBundleCatalogModelsPatch(source);
+      new vm.Script(patched);
+      assert.match(patched, /__cdlxResp/);
+    },
+  },
+  {
+    name: "helper injection survives renamed app-server class",
+    run() {
+      const source = '"use strict";var rW=class{async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}}';
+      const patched = applyMainBundleCatalogModelsPatch(source);
+      assert.ok(patched.startsWith('"use strict";var __codexLinuxMergeCustomEndpointCatalogModelsV3=function('));
+      new vm.Script(patched);
+    },
+  },
+  {
+    name: "stale v1 and v2 patched bundles upgrade to v3",
+    run() {
+      const v1 = 'var __codexLinuxMergeCustomEndpointCatalogModels=function(e,t){return e},nB=class{async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);let r=n.result;try{r=__codexLinuxMergeCustomEndpointCatalogModels(r,await this.getUserSavedConfiguration?.())}catch{}return r}}';
+      const v2 = 'var __codexLinuxMergeCustomEndpointCatalogModels=function(e,t){return e},nB=class{async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e}),r;try{r=await this.getUserSavedConfiguration?.()}catch{}if(n.error){let e=__codexLinuxMergeCustomEndpointCatalogModels({data:[]},r);if(e.data?.length)return e;throw Error(n.error.message??`Failed to read available models`)}let i=n.result;try{i=__codexLinuxMergeCustomEndpointCatalogModels(i,r)}catch{}return i}}';
+      for (const source of [v1, v2]) {
+        const patched = applyMainBundleCatalogModelsPatch(source);
+        assert.match(patched, /__cdlxCfg/);
+        assert.match(patched, /__codexLinuxMergeCustomEndpointCatalogModelsV3/);
+        new vm.Script(patched);
+        assert.equal(applyMainBundleCatalogModelsPatch(patched), patched);
+      }
     },
   },
   {
@@ -61,7 +110,7 @@ const scenarios = [
   {
     name: "current async loader uses server defaults and filters blank titles",
     run() {
-      const source = 'async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:null,archived:!1,sourceKinds:oh,useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
+      const source = 'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data;if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:null,archived:!1,sourceKinds:oh,useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
       const patched = applySidebarProviderFilterPatch(source);
       assert.match(patched, /sourceKinds:\[\]/);
       // modelProviders [] restores all-provider history.
