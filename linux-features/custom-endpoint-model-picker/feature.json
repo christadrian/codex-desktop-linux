@@ -1,0 +1,9 @@
+{
+  "id": "custom-endpoint-model-picker",
+  "title": "Custom Endpoint Model Picker",
+  "description": "Expose the model picker UI when using a custom model provider endpoint (e.g. 9router).",
+  "defaultEnabled": false,
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}

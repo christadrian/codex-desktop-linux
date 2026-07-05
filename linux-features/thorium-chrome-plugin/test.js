@@ -152,10 +152,13 @@ test("Thorium stage hook upgrades a core Linux-patched Chrome plugin", () => {
     const installDir = path.join(workspace, "install");
     const workDir = path.join(workspace, "work");
     const chromePlugin = path.join(installDir, "resources", "plugins", "openai-bundled", "plugins", "chrome");
-    const featuresConfig = path.join(workspace, "features.json");
+    const featuresRoot = path.join(workspace, "linux-features");
+    const featuresConfig = path.join(featuresRoot, "features.json");
 
     fs.mkdirSync(workDir, { recursive: true });
     writeFakeChromePlugin(chromePlugin);
+    fs.mkdirSync(featuresRoot, { recursive: true });
+    fs.cpSync(__dirname, path.join(featuresRoot, "thorium-chrome-plugin"), { recursive: true });
     fs.writeFileSync(featuresConfig, JSON.stringify({ enabled: ["thorium-chrome-plugin"] }, null, 2));
 
     run("node", [path.join(repoRoot, "scripts", "lib", "patch-chrome-plugin.js"), chromePlugin]);
@@ -174,6 +177,7 @@ test("Thorium stage hook upgrades a core Linux-patched Chrome plugin", () => {
     ], {
       env: {
         ...process.env,
+        CODEX_LINUX_FEATURES_ROOT: featuresRoot,
         CODEX_LINUX_FEATURES_CONFIG: featuresConfig,
         LINUX_FEATURES_RUNNER: path.join(repoRoot, "scripts", "lib", "linux-features.sh"),
         REPO_ROOT: repoRoot,

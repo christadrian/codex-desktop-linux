@@ -332,10 +332,10 @@ patchFileFirstMatch(path.join(scriptsDir, "browser-client.mjs"), {
     },
     {
       oldText: String.raw`var IS=async(t,e)=>{let r=Gf(Tc,t,"Local Extension Settings",e);if(!XF(r))return null;let n=await JF(Gf(QF(),"codex"));await ZF(r,n,{recursive:!0}),await kS(Gf(n,"LOCK"));let o=new KF(n,{createIfMissing:!1,keyEncoding:"utf8",valueEncoding:"utf8"});try{await o.open();let i=await o.get("extensionInstanceId");if(!i)return null;let s=JSON.parse(i);return typeof s!="string"?null:s}finally{await o.close(),await kS(n,{force:!0,recursive:!0})}}`,
-      newText: String.raw`var IS=async(t,e,r=Tc)=>{let n=Gf(r,t,"Local Extension Settings",e);if(!XF(n))return null;let o=await JF(Gf(QF(),"codex"));await ZF(n,o,{recursive:!0}),await kS(Gf(o,"LOCK"));let i=new KF(o,{createIfMissing:!1,keyEncoding:"utf8",valueEncoding:"utf8"});try{await i.open();let s=await i.get("extensionInstanceId");if(!s)return null;let a=JSON.parse(s);return typeof a!="string"?null:a}finally{await i.close(),await kS(o,{force:!0,recursive:!0})}}`,
+      newText: String.raw`var IS=async(t,e,r=Tc)=>{let n=Gf(r,t,"Local Extension Settings",e);if(!XF(n))return null;let o=await JF(Gf(QF(),"codex"));await ZF(n,o,{recursive:!0}),await kS(Gf(o,"LOCK"));let i=new KF(o,{createIfMissing:!1,keyEncoding:"utf8",valueEncoding:"utf8"});try{await i.open();let a=await i.get("extensionInstanceId");if(!a)return null;let c=JSON.parse(a);return typeof c!="string"?null:c}finally{await i.close(),await kS(o,{force:!0,recursive:!0})}}`,
     },
   ],
-  alreadyText: ["async(e,t,r=hl)", "async(t,e,r=Tc)", `r,e,"Local Extension Settings"`],
+  alreadyText: ["async(e,t,r=hl)", `r,e,"Local Extension Settings"`],
 });
 
 patchFileFirstMatch(path.join(scriptsDir, "browser-client.mjs"), {
