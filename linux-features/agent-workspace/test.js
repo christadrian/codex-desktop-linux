@@ -1729,6 +1729,33 @@ test("agent-workspace settings resolve latest upstream request API asset", () =>
   }
 });
 
+test("agent-workspace settings resolve current JSX factory and Linux settings layout assets", () => {
+  const tempApp = fs.mkdtempSync(path.join(os.tmpdir(), "codex-agent-workspace-current-jsx-"));
+  try {
+    const { assetsDir } = writeSyntheticExtractedApp(tempApp);
+    fs.rmSync(path.join(assetsDir, "react-test.js"), { force: true });
+    fs.rmSync(path.join(assetsDir, "settings-content-layout-test.js"), { force: true });
+    fs.writeFileSync(
+      path.join(assetsDir, "app-initial~settings-page-test.js"),
+      'import{n as r}from"./chunk-test.js";var vt=r((()=>{var e=Symbol.for(`react.transitional.element`);return{jsx(){return e},jsxs(){return e}}})),yt=r(((e,t)=>{t.exports=vt()}));export{yt as vl};',
+    );
+    fs.writeFileSync(path.join(assetsDir, "linux-settings-page-linux.js"), "function t(){}export{t};");
+
+    const { value: result, warnings } = captureWarns(() => patchAgentWorkspaceSettingsAssets(tempApp));
+
+    assert.equal(result.matched, true);
+    assert.ok(
+      warnings.every((warning) => !warning.includes("Agent Workspaces")),
+      warnings.join("\n"),
+    );
+    const settingsSource = fs.readFileSync(path.join(assetsDir, SETTINGS_ASSET), "utf8");
+    assert.match(settingsSource, /import\{vl as __reactFactory\}from"\.\/app-initial~settings-page-test\.js"/);
+    assert.match(settingsSource, /import\{t as SettingsPage\}from"\.\/linux-settings-page-linux\.js"/);
+  } finally {
+    fs.rmSync(tempApp, { recursive: true, force: true });
+  }
+});
+
 test("feature patch list is intentionally small", () => {
   assert.deepEqual(
     featurePatches.map((patch) => [patch.id, patch.phase]),

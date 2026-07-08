@@ -885,6 +885,17 @@ function applyLinuxCompletedItemRecoveryPatch(currentSource) {
     );
   }
 
+  const modernCompletedItemDropPattern =
+    /([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)&&\(([A-Za-z_$][\w$]*)\.firstTurnWorkItemStartedAtMs=\3\.firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\),!\(\2\.type!==`subAgentActivity`&&!([A-Za-z_$][\w$]*)\(\3,\2\.id,\2\.type\)\)&&\(\2\.type,([A-Za-z_$][\w$]*)\(\3,([A-Za-z_$][\w$]*)\)\)/u;
+
+  if (modernCompletedItemDropPattern.test(currentSource)) {
+    return currentSource.replace(
+      modernCompletedItemDropPattern,
+      (_match, workItemGuardFn, completedItemVar, turnVar, lookupFn, appendItemFn, viewItemVar) =>
+        `${workItemGuardFn}(${completedItemVar})&&(${turnVar}.firstTurnWorkItemStartedAtMs=${turnVar}.firstTurnWorkItemStartedAtMs??Date.now()});let codexLinuxCompletedItemExists=${turnVar}.items.some(e=>e.id===${viewItemVar}.id);if(${completedItemVar}.type!==\`subAgentActivity\`&&codexLinuxCompletedItemExists&&!${lookupFn}(${turnVar},${completedItemVar}.id,${completedItemVar}.type))return;${appendItemFn}(${turnVar},${viewItemVar})`,
+    );
+  }
+
   if (
     currentSource.includes("Item not found in turn state") &&
     currentSource.includes("case`item/completed`") &&

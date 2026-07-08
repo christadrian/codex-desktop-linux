@@ -8,6 +8,7 @@ const {
   findRequiredWebviewAsset,
 } = require("../../scripts/patches/lib/assets.js");
 const {
+  findExportedAlias,
   requireName,
 } = require("../../scripts/patches/lib/minified-js.js");
 
@@ -192,8 +193,8 @@ import{${reactExportName} as __reactFactory}from"./${reactAsset}";
 import{${codexRequestExportName} as __post}from"./${requestAsset}";
 import{${settingsPageExportName} as SettingsPage}from"./${settingsPageAsset}";
 
-var React=__toESM(__reactFactory(),1);
-var h=React.createElement;
+var React=__reactFactory();
+var h=React.createElement?React.createElement:function(type,props){var children=Array.prototype.slice.call(arguments,2),nextProps=props==null?{}:{...props};children.length===1?nextProps.children=children[0]:children.length>1&&(nextProps.children=children);return (children.length>1?React.jsxs:React.jsx)(type,nextProps);};
 var COMMAND_KEY=${JSON.stringify(SETTINGS_COMMAND_KEY)};
 var PERMISSIONS_KEY=${JSON.stringify(SETTINGS_PERMISSIONS_KEY)};
 var DEFAULT_COMMAND_LABEL="Auto-discovered agent-workspace-linux";
@@ -1773,41 +1774,63 @@ function webviewAssetsDir(extractedDir) {
   return path.join(extractedDir, "webview", "assets");
 }
 
+function findReactJsxFactoryWebviewAsset(assetsDir) {
+  const candidates = fs
+    .readdirSync(assetsDir)
+    .filter((name) => /\.js$/.test(name))
+    .sort();
+  for (const assetName of candidates) {
+    const source = fs.readFileSync(path.join(assetsDir, assetName), "utf8");
+    if (!source.includes("react.transitional.element") || !source.includes("jsx")) {
+      continue;
+    }
+    const factoryMatch = source.match(/(?:^|[,;])([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\(\([^)]*\)=>\{[A-Za-z_$][\w$]*\.exports=([A-Za-z_$][\w$]*)\(\)\}\)\)/u);
+    if (factoryMatch == null) {
+      continue;
+    }
+    const exportName = findExportedAlias(source, factoryMatch[1]);
+    if (exportName != null) {
+      return { assetName, exportName };
+    }
+  }
+  const legacyAsset = findRequiredWebviewAsset(assetsDir, /^react-.*\.js$/, "react.transitional.element", "React asset");
+  return { assetName: legacyAsset, exportName: "t" };
+}
+
+function findAgentWorkspaceSettingsPageAsset(assetsDir) {
+  if (fs.existsSync(path.join(assetsDir, "linux-settings-page-linux.js"))) {
+    return { assetName: "linux-settings-page-linux.js", exportName: "t" };
+  }
+  return {
+    assetName: findRequiredWebviewAsset(
+      assetsDir,
+      /^settings-content-layout-.*\.js$/,
+      null,
+      "settings content layout asset",
+    ),
+    exportName: "t",
+  };
+}
+
 function resolveAgentWorkspaceSettingsAsset(extractedDir) {
   const assetsDir = webviewAssetsDir(extractedDir);
   if (!fs.existsSync(assetsDir)) {
     throw new Error(`missing webview assets directory ${assetsDir}`);
   }
 
-  const jsxRuntimeAsset = findRequiredWebviewAsset(
-    assetsDir,
-    /^jsx-runtime-.*\.js$/,
-    "react.transitional.element",
-    "JSX runtime asset",
-  );
-  const jsxRuntimeSource = fs.readFileSync(path.join(assetsDir, jsxRuntimeAsset), "utf8");
-  const jsxExportsReactFactory = /export\{[^}]*\bn\b/.test(jsxRuntimeSource);
-  const reactAsset = jsxExportsReactFactory
-    ? jsxRuntimeAsset
-    : findRequiredWebviewAsset(assetsDir, /^react-.*\.js$/, "react.transitional.element", "React asset");
-  const reactExportName = jsxExportsReactFactory ? "n" : "t";
-  const chunkAsset = findImportedAsset(assetsDir, reactAsset, "React shared chunk asset");
+  const reactFactory = findReactJsxFactoryWebviewAsset(assetsDir);
+  const chunkAsset = findImportedAsset(assetsDir, reactFactory.assetName, "React shared chunk asset");
   const codexRequestAsset = findCodexRequestWebviewAsset(assetsDir);
-  const settingsPageAsset = findRequiredWebviewAsset(
-    assetsDir,
-    /^settings-content-layout-.*\.js$/,
-    null,
-    "settings content layout asset",
-  );
+  const settingsPageAsset = findAgentWorkspaceSettingsPageAsset(assetsDir);
 
   return {
     filePath: path.join(assetsDir, SETTINGS_ASSET),
     source: buildAgentWorkspaceSettingsSource({
       chunkAsset,
-      reactAsset,
-      reactExportName,
-      settingsPageAsset,
-      settingsPageExportName: "t",
+      reactAsset: reactFactory.assetName,
+      reactExportName: reactFactory.exportName,
+      settingsPageAsset: settingsPageAsset.assetName,
+      settingsPageExportName: settingsPageAsset.exportName,
       codexRequestAsset: codexRequestAsset.assetName,
       codexRequestExportName: codexRequestAsset.exportName,
     }),
@@ -1833,6 +1856,32 @@ function patchRequiredAssets(extractedDir, filenamePattern, patchFn, description
       patchedSource: patchFn(currentSource),
     };
   });
+}
+
+function patchFirstPatchableAsset(extractedDir, filenamePattern, patchFn, description, sourceFilter = () => true) {
+  const assetsDir = webviewAssetsDir(extractedDir);
+  const candidates = fs
+    .readdirSync(assetsDir)
+    .filter((name) => filenamePattern.test(name))
+    .sort();
+  const errors = [];
+  for (const candidate of candidates) {
+    const filePath = path.join(assetsDir, candidate);
+    const currentSource = fs.readFileSync(filePath, "utf8");
+    if (!sourceFilter(currentSource)) {
+      continue;
+    }
+    try {
+      return [{
+        filePath,
+        currentSource,
+        patchedSource: patchFn(currentSource),
+      }];
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw new Error(errors[0] ?? `could not find ${description}`);
 }
 
 function applyAgentWorkspaceSettingsSectionsPatch(currentSource) {
@@ -2029,7 +2078,7 @@ function patchAgentWorkspaceRouteAssets(extractedDir) {
   const assetsDir = webviewAssetsDir(extractedDir);
   const candidates = fs
     .readdirSync(assetsDir)
-    .filter((name) => /^(app-main|index)-.*\.js$/.test(name))
+    .filter((name) => /^(?:(?:app-main|index)-|app-initial~app-main~).*\.js$/.test(name))
     .sort();
   let lastError = null;
   const patches = [];
@@ -2066,23 +2115,34 @@ function patchAgentWorkspaceSettingsAssets(extractedDir) {
       ? fs.readFileSync(settingsAsset.filePath, "utf8")
       : null;
     const patches = [
-      ...patchRequiredAssets(
+      ...patchFirstPatchableAsset(
         extractedDir,
-        /^settings-sections-.*\.js$/,
+        /^(?:settings-sections-|app-initial~app-main~.*settings-page.*).*\.js$/,
         applyAgentWorkspaceSettingsSectionsPatch,
         "settings sections bundle",
+        (source) =>
+          source.includes("{slug:`local-environments`},{slug:`worktrees`}") ||
+          source.includes("n=[{slug:`general-settings`},") ||
+          source.includes(`slug:\`${SETTINGS_SLUG}\``),
       ),
-      ...patchRequiredAssets(
+      ...patchFirstPatchableAsset(
         extractedDir,
-        /^settings-shared-.*\.js$/,
+        /^(?:settings-shared-|app-initial~app-main~.*|[a-z]{2}(?:-[A-Z0-9]+)?-).*\.js$/,
         applyAgentWorkspaceSettingsSharedPatch,
         "settings shared bundle",
+        (source) =>
+          source.includes(`settings.nav.${SETTINGS_SLUG}`) ||
+          (source.includes("settings.nav.local-environments") && source.includes("settings.section.worktrees")),
       ),
-      ...patchRequiredAssets(
+      ...patchFirstPatchableAsset(
         extractedDir,
-        /^settings-page-.*\.js$/,
+        /^(?:settings-page-|app-initial~app-main~.*).*\.js$/,
         applyAgentWorkspaceSettingsPagePatch,
         "settings page bundle",
+        (source) =>
+          source.includes(`\`${SETTINGS_SLUG}\``) ||
+          source.includes("`local-environments`,`worktrees`") ||
+          source.includes('"local-environments":'),
       ),
       ...patchAgentWorkspaceRouteAssets(extractedDir),
     ];

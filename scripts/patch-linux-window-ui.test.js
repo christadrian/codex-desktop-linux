@@ -5065,6 +5065,23 @@ test("recovers completed stream items that arrive after local state lost their s
   assert.equal(behavior.wrongType.errors.length, 1);
 });
 
+test("recovers completed stream items in current minified completion bundle", () => {
+  const source =
+    "case`item/completed`:{let{item:e,threadId:t,turnId:r,completedAtMs:i}=n.params,a=B(t);this.updateConversationState(a,t=>{let n=e.type===`userMessage`?tN(t,r):r==null?JM(t):XM(t,e=>e.turnId===r);if(!n)return;Pz(n);let a=xN({item:e,threadsById:this.threadStore.threadsById,onCollabAgentToolCall:e=>{this.hydrateCollabThreads(e.receiverThreadIds)}}),o=a.type===`contextCompaction`?n.items.find(e=>e.type===`contextCompaction`&&e.id===a.id):null;let s=Lj(a.type===`contextCompaction`?{...a,completed:!0,source:o?.type===`contextCompaction`&&`source`in o?o.source:`automatic`}:a);if(e.type===`hookPrompt`){bP(n,s);return}yV(e)&&(n.firstTurnWorkItemStartedAtMs=n.firstTurnWorkItemStartedAtMs??Date.now()),!(e.type!==`subAgentActivity`&&!LB(n,e.id,e.type))&&(e.type,bP(n,s))});break}case`item/agentMessage/delta`:{}";
+
+  const patched = applyPatchTwice(applyLinuxCompletedItemRecoveryPatch, source);
+
+  assert.match(patched, /codexLinuxCompletedItemExists=n\.items\.some\(e=>e\.id===s\.id\)/);
+  assert.match(
+    patched,
+    /if\(e\.type!==`subAgentActivity`&&codexLinuxCompletedItemExists&&!LB\(n,e\.id,e\.type\)\)return;bP\(n,s\)/,
+  );
+  assert.doesNotMatch(
+    patched,
+    /!\(e\.type!==`subAgentActivity`&&!LB\(n,e\.id,e\.type\)\)&&\(e\.type,bP\(n,s\)\)/,
+  );
+});
+
 test("treats empty active runtime status as stale once response rendering has completed", () => {
   const source =
     "function LQt({hasInProgressSideChat:e,isResponseInProgress:t,latestTurnHasSystemError:n,resumeState:r,threadRuntimeStatus:i}){return e?`loading`:i?.type===`systemError`?`error`:i?.type===`active`?`loading`:r===`needs_resume`?`idle`:n?`error`:t===!0?`loading`:`idle`}";

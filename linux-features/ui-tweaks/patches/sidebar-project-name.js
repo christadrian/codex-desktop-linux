@@ -2,7 +2,7 @@
 
 const DEFAULT_PROJECT_NAME_STYLE = "font-weight: 700 !important; padding-top: 0.25rem;";
 const PROJECTS_SIDEBAR_ASSET_PATTERN =
-  /^app-initial~app-main~remote-conversation-page~projects-index-page-[^.]+\.js$/;
+  /^(?:app-initial~app-main~.*|projects-index-page)-[^.]+\.js$/;
 const PROJECT_NAME_SELECTOR = ".group\\/folder-row .min-w-0.truncate.pr-1";
 const STYLE_ID = "codex-linux-ui-tweaks-sidebar-project-name-style";
 const RUNTIME_MARKER = "codexLinuxUiTweaksSidebarProjectNameStyleRuntime";
@@ -120,8 +120,7 @@ const descriptors = [
     pattern: PROJECTS_SIDEBAR_ASSET_PATTERN,
     missingDescription: "projects sidebar bundle",
     skipDescription: "ui-tweaks sidebar project name style patch",
-    apply: (source, context = {}) =>
-      applySidebarProjectNameStylePatch(source, { ...context, warnOnMissingMarkers: true }),
+    apply: (source, context = {}) => applySidebarProjectNameStylePatch(source, context),
   },
 ];
 

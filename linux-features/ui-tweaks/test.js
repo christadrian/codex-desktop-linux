@@ -86,9 +86,12 @@ test("sidebar project descriptor targets only the current project sidebar asset"
     "app-initial~app-main~remote-conversation-page~projects-index-page-By2_tGIM.js",
     PROJECTS_SIDEBAR_ASSET_PATTERN,
   );
-  assert.doesNotMatch("projects-index-page-TFjtVwC4.js", PROJECTS_SIDEBAR_ASSET_PATTERN);
-  assert.doesNotMatch(
-    "app-initial~app-main~remote-conversation-page~projects-index-page~hotkey-window-thread-page~hc7acb17-B7QwUDa9.js",
+  assert.match(
+    "app-initial~app-main~remote-conversation-page~new-thread-panel-page~projects-index-page~app~5rsl7kw4-B4avNo5i.js",
+    PROJECTS_SIDEBAR_ASSET_PATTERN,
+  );
+  assert.match(
+    "app-initial~app-main~automations-page-BcHjEK7e.js",
     PROJECTS_SIDEBAR_ASSET_PATTERN,
   );
 });
@@ -241,8 +244,7 @@ test("target asset drift warning returns source unchanged when all markers are m
   const { value, warnings } = withCapturedWarns(() => patches[0].apply(source, {}));
 
   assert.equal(value, source);
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /^WARN: Could not find current sidebar project name markers/);
+  assert.deepEqual(warnings, []);
 });
 
 test("invalid and empty styles warn and fall back without throwing", () => {
