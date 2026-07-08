@@ -226,6 +226,9 @@ try {
     if (source.includes(internals.PICKER_WEBVIEW_CATALOG_MARKER)) {
       pass(`${name}: picker catalog injection present`);
     }
+    if (source.includes(internals.PICKER_REASONING_FALLBACK_MARKER)) {
+      pass(`${name}: picker reasoning fallback present`);
+    }
   }
   if (!guardHandled) {
     warn(`no chunk shows the disabled allowlist guard — custom models may be filtered out of the picker`);

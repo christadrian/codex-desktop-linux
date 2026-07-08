@@ -47,6 +47,27 @@ const scenarios = [
     },
   },
   {
+    name: "custom endpoint models keep efforts when enabled filter is empty",
+    run() {
+      const source = 'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
+      const patched = applyModelPickerAllowlistPatch(source);
+      assert.match(patched, /__codexLinuxCustomEndpointReasoningFallback/);
+      const vbe = vm.runInNewContext(`${patched};vbe`, {
+        pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort),
+      });
+      const result = vbe({
+        authMethod: "apiKey",
+        availableModels: new Set(),
+        defaultModel: null,
+        enabledReasoningEfforts: new Set(),
+        includeUltraReasoningEffort: true,
+        models: [{ model: "cx/test", hidden: false, supportedReasoningEfforts: [{ reasoningEffort: "medium", description: "Medium" }] }],
+        useHiddenModels: false,
+      });
+      assert.equal(result.models.find((model) => model.model === "cx/test").supportedReasoningEfforts.length, 1);
+    },
+  },
+  {
     name: "bundle randomUUID module var preserved",
     run() {
       const source = 'var nB=class{async listModels(e){await this.ensureReady();let t=`model/list:${(0,c.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}}';

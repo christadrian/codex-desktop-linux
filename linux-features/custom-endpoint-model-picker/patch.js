@@ -18,6 +18,7 @@ const PICKER_WEBVIEW_CATALOG_MARKER = "__codexLinuxCustomEndpointWebviewModels";
 const PICKER_WEBVIEW_NEEDLE = /(function \w+\(\{authMethod:\w+,availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:\w+,models:(\w+),useHiddenModels:\w+\}\)\{)/;
 const PICKER_DYNAMIC_CONFIG_MARKER = "__codexLinuxCustomEndpointDynamicConfigModels";
 const PICKER_DYNAMIC_CONFIG_NEEDLE = /(return\{availableModels:new Set\()([^)]*)(\),useHiddenModels:[^,]+,defaultModel:)([^}]+)(\}\})/;
+const PICKER_REASONING_FALLBACK_MARKER = "__codexLinuxCustomEndpointReasoningFallback";
 const PICKER_COMPOSER_MENU_MARKER = "__codexLinuxCustomEndpointComposerMenuModels";
 const PICKER_COMPOSER_MENU_NEEDLES = [
   /(,)(\w+)=(\w+)\?\.models(,\{modelSettings:\w+,setModelAndReasoningEffort:\w+\}=\w+\(\w+\),\w+=\w+\.model;)/,
@@ -173,6 +174,16 @@ function applyModelPickerAllowlistPatch(source) {
       PICKER_WEBVIEW_NEEDLE,
       (_match, prefix, modelsVar) =>
         `${prefix}let ${PICKER_WEBVIEW_CATALOG_MARKER}=${modelsJson};${modelsVar}=[...${PICKER_WEBVIEW_CATALOG_MARKER},...${modelsVar}.filter(e=>Array.isArray(e?.supportedReasoningEfforts)&&!${PICKER_WEBVIEW_CATALOG_MARKER}.some(t=>t.model===e.model))];`,
+    );
+  }
+  if (!source.includes(PICKER_REASONING_FALLBACK_MARKER)) {
+    source = source.replaceAll(
+      ").filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a",
+      `).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));${PICKER_REASONING_FALLBACK_MARKER}:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a`,
+    );
+    source = source.replace(
+      /(let (\w+)=\([^;]+?\)\.filter\(\(\{reasoningEffort:(\w+)\}\)=>pq\(\3\)&&\w+\.has\(\3\)\)),(\w+)=\{(\.\.\.\w+,supportedReasoningEfforts:\2)([,}])/g,
+      `$1;${PICKER_REASONING_FALLBACK_MARKER}:if(!$2.length)$2=t.filter(({reasoningEffort:$3})=>pq($3));let $4={$5$6`,
     );
   }
   if (PICKER_CURRENT_APPLIED.test(source) || PICKER_GUARD_DISABLED_MARKER.test(source)) {
@@ -353,6 +364,7 @@ module.exports = {
     PICKER_WEBVIEW_NEEDLE,
     PICKER_DYNAMIC_CONFIG_MARKER,
     PICKER_DYNAMIC_CONFIG_NEEDLE,
+    PICKER_REASONING_FALLBACK_MARKER,
     PICKER_COMPOSER_MENU_MARKER,
     PICKER_COMPOSER_MENU_NEEDLES,
     SIDEBAR_APPLIED_MARKER,

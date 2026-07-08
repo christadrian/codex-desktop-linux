@@ -29,9 +29,9 @@ const pickerFixture =
 const pickerPatched =
   'function init(){let e=!1,r=[{name:"foo"}];r.forEach(console.log)}';
 const currentPickerFixture =
-  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){s.push(n)}}),{models:s,defaultModel:c}}';
+  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
 const currentPickerPatched =
-  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=!1,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){s.push(n)}}),{models:s,defaultModel:c}}';
+  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=!1,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));__codexLinuxCustomEndpointReasoningFallback:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
 const dynamicConfigFixture =
   'function cMt(e){let t=Wu(K()).safeParse(e.available_models),n=zu().safeParse(e.use_hidden_models),r=K().safeParse(e.default_model);return{availableModels:new Set(t.success?t.data:vq),useHiddenModels:n.success?n.data:yq.useHiddenModels,defaultModel:r.success?r.data:yq.defaultModel}}';
 const composerMenuFixture =
@@ -236,12 +236,12 @@ test("model picker patch injects catalog into composer menu models", () => {
 test("model picker patch drops raw provider models that would crash current selector", () => {
   withCatalogCodexHome(catalogFixture, () => {
     const patched = applyModelPickerAllowlistPatch(currentPickerFixture);
-    const vbe = vm.runInNewContext(`${patched};vbe`, {});
+    const vbe = vm.runInNewContext(`${patched};vbe`, { pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort) });
     const result = vbe({
       authMethod: "apiKey",
       availableModels: new Set(),
       defaultModel: null,
-      enabledReasoningEfforts: [],
+      enabledReasoningEfforts: new Set(),
       includeUltraReasoningEffort: true,
       // Raw provider rows: one without effort metadata (previously crashed
       // `models.some(m=>m.supportedReasoningEfforts.some(...))`), one duplicate
@@ -255,6 +255,25 @@ test("model picker patch drops raw provider models that would crash current sele
     }
     const gpt = result.models.find((model) => model.model === "cx/gpt-5.5");
     assert.equal(gpt.displayName, "GPT-5.5");
+    assert.equal(gpt.supportedReasoningEfforts.map((effort) => effort.reasoningEffort).join(","), "medium");
+  });
+});
+
+test("model picker keeps catalog model efforts when enabled-effort filter is empty", () => {
+  withCatalogCodexHome(catalogFixture, () => {
+    const patched = applyModelPickerAllowlistPatch(currentPickerFixture);
+    const vbe = vm.runInNewContext(`${patched};vbe`, { pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort) });
+    const result = vbe({
+      authMethod: "apiKey",
+      availableModels: new Set(),
+      defaultModel: null,
+      enabledReasoningEfforts: new Set(),
+      includeUltraReasoningEffort: true,
+      models: [],
+      useHiddenModels: false,
+    });
+    assert.ok(result.models.some((model) => model.model === "cx/gpt-5.5"));
+    assert.ok(result.models.every((model) => model.supportedReasoningEfforts.length > 0));
   });
 });
 
