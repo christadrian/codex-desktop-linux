@@ -9,7 +9,6 @@ const RUNTIME_MARKER = "codexLinuxUiTweaksSidebarProjectNameStyleRuntime";
 const UNSAFE_PROJECT_NAME_STYLE_PATTERN = /[{}@<>]|\r|\n|\/\*|\*\/|\burl\s*\(/i;
 
 const SIDEBAR_PROJECT_NAME_MARKERS = [
-  "sidebarElectron.projectsNavLink",
   "group/folder-row",
   "className:`min-w-0 truncate pr-1`",
 ];

@@ -1,19 +1,19 @@
-### Agent Workspaces Settings Page
+### Agent Workspace Settings Page
 
-File: /home/christadrian/Projects/codex-desktop-setup/linux-features/agent-workspace/patch.js
+File: linux-features/agent-workspace/patch.js
 Last updated: 2026-07-08
 
 | Property         | Class                                                                 |
 | ---------------- | --------------------------------------------------------------------- |
-| Background       | bg-transparent                                                        |
-| Border           | border border-token-border-light                                      |
-| Border radius    | rounded-lg                                                            |
-| Text — primary   | text-token-text-primary                                               |
-| Text — secondary | text-token-text-secondary                                             |
-| Spacing          | p-4, gap-4, gap-2                                                     |
-| Hover state      | hover:bg-token-bg-secondary                                           |
-| Shadow           | none                                                                  |
-| Accent usage     | text-token-text-primary for active labels, token borders for grouping |
+| Background       | bg-token-bg-primary, bg-token-main-surface-secondary                  |
+| Border           | border border-token-border-default                                    |
+| Border radius    | rounded-md                                                            |
+| Text — primary   | text-token-text-primary, text-xl font-semibold                        |
+| Text — secondary | text-token-text-secondary, text-sm                                    |
+| Spacing          | gap-6 px-4 py-6, gap-3 p-3                                           |
+| Hover state      | hover:bg-token-main-surface-secondary                                 |
+| Shadow           | shadow-sm                                                             |
+| Accent usage     | border-yellow-500/40, text-yellow-700 dark:text-yellow-300 for warnings |
 
 **Pattern notes:**
-Generated Linux settings pages should reuse upstream token classes, rounded cards, light token borders, and compact 4/2 spacing. Avoid feature-specific colors so optional settings blend into the native Codex settings surface.
+Generated settings panels use upstream Codex token classes, `rounded-md` cards/buttons, neutral token borders, and yellow token-compatible warning accents. Future Linux feature settings pages should match these token classes instead of hardcoded colors.
