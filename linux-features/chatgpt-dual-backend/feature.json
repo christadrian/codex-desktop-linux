@@ -1,0 +1,10 @@
+{
+  "id": "chatgpt-dual-backend",
+  "title": "ChatGPT Chat and Sites with Custom Endpoints",
+  "description": "Keep Codex runs on a custom provider while ChatGPT Chat and Sites use the authenticated ChatGPT desktop backend.",
+  "defaultEnabled": false,
+  "requires": ["custom-endpoint-model-picker"],
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}
