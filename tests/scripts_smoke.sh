@@ -651,6 +651,7 @@ SCRIPT
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/Cargo.toml"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/CHANGELOG.md"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/computer-use-linux/Cargo.toml"
+    assert_file_not_exists "$pkg_root/opt/codex-desktop/update-builder/global-dictation-linux/Cargo.toml"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/read-aloud-linux/Cargo.toml"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/updater/Cargo.toml"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/plugins/openai-bundled/plugins/computer-use/.mcp.json"
@@ -735,12 +736,15 @@ test_update_builder_preserves_enabled_linux_features_config() {
 
     mkdir -p "$workspace"
     make_fake_app "$app_dir"
-    mkdir -p "$features_root/example-feature" "$features_root/local/local-tool"
+    mkdir -p "$features_root/example-feature" "$features_root/global-dictation" "$features_root/local/local-tool"
     printf '%s\n' '# Linux Features' > "$features_root/README.md"
     printf '%s\n' '{"enabled":[]}' > "$features_root/features.example.json"
     printf '%s\n' '{"id":"example-feature","title":"Example Linux Feature"}' \
         > "$features_root/example-feature/feature.json"
     printf '%s\n' '# Example Linux Feature' > "$features_root/example-feature/README.md"
+    printf '%s\n' '{"id":"global-dictation","title":"Global Dictation"}' \
+        > "$features_root/global-dictation/feature.json"
+    printf '%s\n' '# Global Dictation' > "$features_root/global-dictation/README.md"
     printf '%s\n' '{"id":"local-tool","title":"Local Tool"}' \
         > "$features_root/local/local-tool/feature.json"
     printf '%s\n' '# Local Tool' > "$features_root/local/local-tool/README.md"
@@ -748,6 +752,7 @@ test_update_builder_preserves_enabled_linux_features_config() {
 {
   "enabled": [
     "example-feature",
+    "global-dictation",
     "local-tool"
   ],
   "settings": {
@@ -785,21 +790,24 @@ JSON
     assert_file_exists "$staged_local_manifest"
     assert_file_exists "$update_builder_manifest"
     assert_contains "$staged_config" "example-feature"
+    assert_contains "$staged_config" "global-dictation"
     assert_contains "$staged_config" "local-tool"
     assert_contains "$staged_config" "tweaks"
     assert_contains "$staged_config" "mode"
     assert_not_contains "$staged_config" "localComment"
     assert_not_contains "$staged_config" "disabled-feature"
     assert_contains "$update_builder_manifest" "record-replay-linux/Cargo.toml"
+    assert_contains "$update_builder_manifest" "global-dictation-linux/Cargo.toml"
     assert_contains "$update_builder_manifest" "assets/codex-linux.png"
     assert_not_contains "$update_builder_manifest" "^node-runtime/"
+    assert_file_exists "$root/opt/codex-desktop/update-builder/global-dictation-linux/Cargo.toml"
 
     node - "$staged_config" <<'NODE' || fail "Expected staged Linux features config to be sanitized"
 const fs = require("node:fs");
 const configPath = process.argv[2];
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 const expected = {
-  enabled: ["example-feature", "local-tool"],
+  enabled: ["example-feature", "global-dictation", "local-tool"],
   settings: {
     "example-feature": {
       tweaks: {
