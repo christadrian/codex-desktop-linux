@@ -13,7 +13,7 @@ module.exports = [
     phase: "webview-asset",
     order: 1043,
     ciPolicy: "optional",
-    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~).*\.js$/,
+    pattern: /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*(?:remote-conversation|thread-app-shell-chrome|pull-request-code-review~onboarding-page~hotkey-window-thread-page)).*\.js$/,
     missingDescription: "app-server manager signals bundle",
     skipDescription: "Linux app-server conversation hydration patch",
     apply: applyLinuxAppServerConversationHydrationPatch,

@@ -143,7 +143,9 @@ function applyLinuxTerminalUserPathPatch(currentSource) {
 
   const terminalEnvRegex =
     /async buildTerminalEnv\(([^)]*)\)\{let ([A-Za-z_$][\w$]*)=\{\.\.\.process\.env\};([\s\S]*?)return process\.platform!==`win32`&&\(\2\.TERM=([A-Za-z_$][\w$]*),delete \2\.TERMINFO,delete \2\.TERMINFO_DIRS\),([A-Za-z_$][\w$]*)\.\$r\(\2\)\}/u;
-  const match = currentSource.match(terminalEnvRegex);
+  const match = currentSource.match(terminalEnvRegex) ?? currentSource.match(
+    /async buildTerminalEnv\(([^)]*)\)\{let ([A-Za-z_$][\w$]*)=\{\.\.\.process\.env\};([\s\S]*?)return process\.platform!==`win32`&&\(\2\.TERM=([A-Za-z_$][\w$]*),delete \2\.TERMINFO,delete \2\.TERMINFO_DIRS\),([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(\2\)\}/u,
+  );
   if (match == null) {
     if (currentSource.includes("buildTerminalEnv") && currentSource.includes("node-pty")) {
       console.warn("WARN: Could not find terminal environment builder — skipping Linux terminal PATH patch");

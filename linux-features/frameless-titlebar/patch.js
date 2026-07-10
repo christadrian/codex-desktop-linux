@@ -30,7 +30,15 @@ function applyFramelessTitlebarBranchPatch(currentSource) {
     return `${platformAlias}===\`linux\`?{titleBarStyle:\`hidden\`}:`;
   });
 
-  if (!patchedTitlebar && !/===`linux`\?\{titleBarStyle:`hidden`\}/.test(patchedSource)) {
+  patchedSource = patchedSource.replace(
+    /case`quickChat`:case`primary`:return ([A-Za-z_$][\w$]*)===`darwin`\?(\{titleBarStyle:`hiddenInset`,trafficLightPosition:[\s\S]*?\}):\1===`win32`\|\|\1===`linux`\?\{titleBarStyle:`hidden`,titleBarOverlay:([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\),\.\.\.([A-Za-z_$][\w$]*)===`quickChat`\?\{resizable:!0\}:\{\}\}:\{titleBarStyle:`default`,\.\.\.\5===`quickChat`\?\{resizable:!0\}:\{\}\};/gu,
+    (_match, platformAlias, darwinBranch, overlayAlias, zoomAlias, appearanceAlias) => {
+      patchedTitlebar = true;
+      return `case\`quickChat\`:case\`primary\`:return ${platformAlias}===\`darwin\`?${darwinBranch}:${platformAlias}===\`win32\`?{titleBarStyle:\`hidden\`,titleBarOverlay:${overlayAlias}(${zoomAlias}),...${appearanceAlias}===\`quickChat\`?{resizable:!0}:{}}:${platformAlias}===\`linux\`?{titleBarStyle:\`hidden\`,...${appearanceAlias}===\`quickChat\`?{resizable:!0}:{}}:{titleBarStyle:\`default\`,...${appearanceAlias}===\`quickChat\`?{resizable:!0}:{}};`;
+    },
+  );
+
+  if (!patchedTitlebar && !/===`linux`\?\{titleBarStyle:`hidden`(?:,|\})/.test(patchedSource)) {
     console.warn("WARN: Could not find primary BrowserWindow titlebar snippet - skipping frameless titlebar branch patch");
   }
 
@@ -64,15 +72,15 @@ function applyFramelessTitlebarOverlaySyncPatch(currentSource) {
   );
 
   patchedSource = patchedSource.replace(
-    /(install(?:Windows|ApplicationMenu)TitleBarOverlaySync)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{if\((?:\(process\.platform!==`win32`&&process\.platform!==`linux`\)|process\.platform!==`win32`&&process\.platform!==`linux`)\|\|\3!==`primary`\)return;let ([A-Za-z_$][\w$]*)=\(\)=>\{\2\.isDestroyed\(\)\|\|\2\.setTitleBarOverlay\(([A-Za-z_$][\w$]*)\(this\.windowZooms\.get\(\2\.id\)\)\)\};return ([A-Za-z_$][\w$]*)\.nativeTheme\.on\(`updated`,\4\),\4\(\),\(\)=>\{\6\.nativeTheme\.off\(`updated`,\4\)\}\}/g,
-    (_match, methodName, windowAlias, windowTypeAlias, updateAlias, overlayHelperAlias, electronAlias) =>
-      `${methodName}(${windowAlias},${windowTypeAlias}){if(process.platform!==\`win32\`||${windowTypeAlias}!==\`primary\`)return;let ${updateAlias}=()=>{${windowAlias}.isDestroyed()||${windowAlias}.setTitleBarOverlay(${overlayHelperAlias}(this.windowZooms.get(${windowAlias}.id)))};return ${electronAlias}.nativeTheme.on(\`updated\`,${updateAlias}),${updateAlias}(),()=>{${electronAlias}.nativeTheme.off(\`updated\`,${updateAlias})}}`,
+    /(install(?:Windows|ApplicationMenu)TitleBarOverlaySync)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{if\((?:\(process\.platform!==`win32`&&process\.platform!==`linux`\)|process\.platform!==`win32`&&process\.platform!==`linux`)\|\|\3!==`primary`(&&\3!==`quickChat`)?\)return;let ([A-Za-z_$][\w$]*)=\(\)=>\{\2\.isDestroyed\(\)\|\|\2\.setTitleBarOverlay\(([A-Za-z_$][\w$]*)\(this\.windowZooms\.get\(\2\.id\)\)\)\};return ([A-Za-z_$][\w$]*)\.nativeTheme\.on\(`updated`,\5\),\5\(\),\(\)=>\{\7\.nativeTheme\.off\(`updated`,\5\)\}\}/g,
+    (_match, methodName, windowAlias, windowTypeAlias, quickChatGuard, updateAlias, overlayHelperAlias, electronAlias) =>
+      `${methodName}(${windowAlias},${windowTypeAlias}){if(process.platform!==\`win32\`||${windowTypeAlias}!==\`primary\`${quickChatGuard ?? ""})return;let ${updateAlias}=()=>{${windowAlias}.isDestroyed()||${windowAlias}.setTitleBarOverlay(${overlayHelperAlias}(this.windowZooms.get(${windowAlias}.id)))};return ${electronAlias}.nativeTheme.on(\`updated\`,${updateAlias}),${updateAlias}(),()=>{${electronAlias}.nativeTheme.off(\`updated\`,${updateAlias})}}`,
   );
 
   return patchedSource.replace(
-    /(install(?:Windows|ApplicationMenu)TitleBarOverlaySync)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{if\(\(process\.platform!==`win32`&&process\.platform!==`linux`\)\|\|\3!==`primary`\)return;let ([A-Za-z_$][\w$]*)=\(\)=>\{\2\.isDestroyed\(\)\|\|\2\.setTitleBarOverlay\(process\.platform===`linux`\?codexLinuxTitleBarOverlay\(this\.windowZooms\.get\(\2\.id\)\):([A-Za-z_$][\w$]*)\(this\.windowZooms\.get\(\2\.id\)\)\)\};return ([A-Za-z_$][\w$]*)\.nativeTheme\.on\(`updated`,\4\),\4\(\),\(\)=>\{\6\.nativeTheme\.off\(`updated`,\4\)\}\}/g,
-    (_match, methodName, windowAlias, windowTypeAlias, updateAlias, windowsOverlayHelperAlias, electronAlias) =>
-      `${methodName}(${windowAlias},${windowTypeAlias}){if(process.platform!==\`win32\`||${windowTypeAlias}!==\`primary\`)return;let ${updateAlias}=()=>{${windowAlias}.isDestroyed()||${windowAlias}.setTitleBarOverlay(${windowsOverlayHelperAlias}(this.windowZooms.get(${windowAlias}.id)))};return ${electronAlias}.nativeTheme.on(\`updated\`,${updateAlias}),${updateAlias}(),()=>{${electronAlias}.nativeTheme.off(\`updated\`,${updateAlias})}}`,
+    /(install(?:Windows|ApplicationMenu)TitleBarOverlaySync)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{if\(\(process\.platform!==`win32`&&process\.platform!==`linux`\)\|\|\3!==`primary`(&&\3!==`quickChat`)?\)return;let ([A-Za-z_$][\w$]*)=\(\)=>\{\2\.isDestroyed\(\)\|\|\2\.setTitleBarOverlay\(process\.platform===`linux`\?codexLinuxTitleBarOverlay\(this\.windowZooms\.get\(\2\.id\)\):([A-Za-z_$][\w$]*)\(this\.windowZooms\.get\(\2\.id\)\)\)\};return ([A-Za-z_$][\w$]*)\.nativeTheme\.on\(`updated`,\5\),\5\(\),\(\)=>\{\7\.nativeTheme\.off\(`updated`,\5\)\}\}/g,
+    (_match, methodName, windowAlias, windowTypeAlias, quickChatGuard, updateAlias, windowsOverlayHelperAlias, electronAlias) =>
+      `${methodName}(${windowAlias},${windowTypeAlias}){if(process.platform!==\`win32\`||${windowTypeAlias}!==\`primary\`${quickChatGuard ?? ""})return;let ${updateAlias}=()=>{${windowAlias}.isDestroyed()||${windowAlias}.setTitleBarOverlay(${windowsOverlayHelperAlias}(this.windowZooms.get(${windowAlias}.id)))};return ${electronAlias}.nativeTheme.on(\`updated\`,${updateAlias}),${updateAlias}(),()=>{${electronAlias}.nativeTheme.off(\`updated\`,${updateAlias})}}`,
   );
 }
 

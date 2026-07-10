@@ -276,10 +276,15 @@ function inferRuntimeDependenciesFromSettingsSource(source) {
 }
 
 function findNativeKeyboardShortcutsSettingsAsset(webviewAssetsDir) {
-  return fs
-    .readdirSync(webviewAssetsDir)
-    .filter((name) => /^keyboard-shortcuts-settings-.*\.js$/.test(name))
-    .sort()[0] ?? null;
+  for (const name of fs.readdirSync(webviewAssetsDir).filter((name) => name.endsWith(".js")).sort()) {
+    if (
+      /^keyboard-shortcuts-settings-.*\.js$/.test(name) ||
+      fs.readFileSync(path.join(webviewAssetsDir, name), "utf8").includes("settings.keyboardShortcuts.search.placeholder")
+    ) {
+      return name;
+    }
+  }
+  return null;
 }
 
 function tryFindRequiredWebviewAsset(webviewAssetsDir, namePattern, requiredContent, description) {
@@ -411,6 +416,16 @@ function resolveSettingsAssetDependencies(extractedDir, { includeHotkeySettings 
   if (nativeKeyboardShortcutsAsset != null) {
     const source = fs.readFileSync(path.join(webviewAssetsDir, nativeKeyboardShortcutsAsset), "utf8");
     runtimeDependencies = inferRuntimeDependenciesFromSettingsSource(source);
+  }
+  if (runtimeDependencies == null) {
+    for (const assetName of fs.readdirSync(webviewAssetsDir).filter((name) => name.endsWith(".js")).sort()) {
+      runtimeDependencies = inferRuntimeDependenciesFromSettingsSource(
+        fs.readFileSync(path.join(webviewAssetsDir, assetName), "utf8"),
+      );
+      if (runtimeDependencies != null) {
+        break;
+      }
+    }
   }
 
   let jsxRuntimeAsset;
@@ -692,7 +707,8 @@ function hasNativeKeyboardShortcutsSettings(extractedDir) {
     .filter((name) => name.endsWith(".js"))
     .sort();
   const hasKeyboardShortcutsAsset = assets.some((name) =>
-    /^keyboard-shortcuts-settings-.*\.js$/.test(name),
+    /^keyboard-shortcuts-settings-.*\.js$/.test(name) ||
+      fs.readFileSync(path.join(webviewAssetsDir, name), "utf8").includes("settings.keyboardShortcuts.search.placeholder"),
   );
   if (!hasKeyboardShortcutsAsset) {
     return false;
@@ -1015,7 +1031,8 @@ function isSettingsRouteBundleSource(currentSource) {
   // icon map (slug -> SVG component), which caused the route patch to inject the
   // settings page component as a navigation icon and render a broken nav entry.
   return currentSource.includes(linuxDesktopSettingsAsset)
-    || /"general-settings":\(0,[A-Za-z_$][\w$]*\.lazy\)\(\(\)=>[A-Za-z_$][\w$]*\(/.test(currentSource);
+    || /"general-settings":\(0,[A-Za-z_$][\w$]*\.lazy\)\(\(\)=>[A-Za-z_$][\w$]*\(/.test(currentSource)
+    || /"general-settings":[A-Za-z_$][\w$]*\(async\(\)=>\(await [A-Za-z_$][\w$]*\(async\(\)=>\{let\{GeneralSettings:/.test(currentSource);
 }
 
 function isSettingsSectionsMetadataBundleSource(currentSource) {
@@ -1052,6 +1069,7 @@ function applyLinuxDesktopSettingsRoutePatch(currentSource) {
     // IIFE body (`...,X={"general-settings":(0,Y.lazy)(...)`) in newer split chunks,
     // so the `var` keyword is optional and preserved when present.
     const routePattern = /(var )?([A-Za-z_$][\w$]*)=\{([^;]*?)"general-settings":(?=\(0,([A-Za-z_$][\w$]*)\.lazy\)\(\(\)=>([A-Za-z_$][\w$]*)\()/;
+    const asyncRoutePattern = /((?:var )?[A-Za-z_$][\w$]*=\{)([^;}]*?)"general-settings":(?=([A-Za-z_$][\w$]*)\(async\(\)=>)/;
     const directRoutePattern = /((?:var )?[A-Za-z_$][\w$]*=\{)([^;}]*?)"general-settings":(?=[A-Za-z_$][\w$]*,)/;
     // A navigation/icon bundle (it carries the `slugs:[`general-settings`,...]`
     // group array) also exposes a `{"general-settings":ID,...}` map, but those IDs
@@ -1063,6 +1081,12 @@ function applyLinuxDesktopSettingsRoutePatch(currentSource) {
         routePattern,
         (_match, varKeyword, routeMap, beforeGeneralSettings, lazyAlias, preloadAlias) =>
           `${varKeyword ?? ""}${routeMap}={"linux-desktop":(0,${lazyAlias}.lazy)(()=>${preloadAlias}(()=>import(\`./${linuxDesktopSettingsAsset}\`),[],import.meta.url)),${beforeGeneralSettings}"general-settings":`,
+      );
+    } else if (!isNavigationBundle && asyncRoutePattern.test(patchedSource)) {
+      patchedSource = patchedSource.replace(
+        asyncRoutePattern,
+        (_match, prefix, beforeGeneralSettings, lazyWrapper) =>
+          `${prefix}"linux-desktop":${lazyWrapper}(async()=>(await import(\`./${linuxDesktopSettingsAsset}\`)).LinuxDesktopSettings),${beforeGeneralSettings}"general-settings":`,
       );
     } else if (!isNavigationBundle && directRoutePattern.test(patchedSource)) {
       patchedSource = `import{LinuxDesktopSettings as codexLinuxDesktopSettings}from"./${linuxDesktopSettingsAsset}";${patchedSource}`;

@@ -876,12 +876,19 @@ test("assistant render patch ignores normalized assistant items without render p
 });
 
 test("assistant render patch still warns when an assistant render candidate drifts", () => {
-  const source = "return renderMessage({item:n,assistantCopyText:p,conversationId:o,renderCodeBlocksAsWritingBlocks:V})";
+  const source = "return ui.jsx)(Message,{item:n,assistantCopyText:p,conversationId:o,nested:{drifted:V}})";
   const { result: patched, warnings } = captureWarnings(() => applyAssistantRenderPatch(source));
 
   assert.equal(patched, source);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /Could not find assistant message render call/);
+});
+
+test("assistant component definitions do not emit false drift warnings", () => {
+  const source = "function Message({item:e,assistantCopyText:n,conversationId:r,renderCodeBlocksAsWritingBlocks:i}){return e}";
+  const { result: patched, warnings } = captureWarnings(() => applyAssistantRenderPatch(source));
+  assert.equal(patched, source);
+  assert.deepEqual(warnings, []);
 });
 
 test("assistant render patch preserves the current JSX runtime alias", () => {

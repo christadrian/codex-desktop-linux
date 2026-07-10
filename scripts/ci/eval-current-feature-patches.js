@@ -5,9 +5,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const EXPECTED_PATCHES = [
+  "linux-chrome-plugin-auto-install",
+  "browser-use-node-repl-approval",
+  "linux-app-server-conversation-hydration",
+  "automation-update-eager-tool",
+  "local-environment-action-modal-draft",
+  "keybinds-settings",
   "feature:authenticated-proxy:main-process-proxy-auth",
   "feature:appshots:linux-appshots-availability",
   "feature:appshots:linux-appshots-settings-hotkey",
+  "feature:open-target-discovery:main-bundle-open-target-discovery",
+  "feature:frameless-titlebar:main-process",
   "feature:remote-control-ui:remote-connections-visibility",
   "feature:remote-control-ui:remote-control-connections-visibility",
   "feature:remote-control-ui:experimental-features",
@@ -15,6 +23,10 @@ const EXPECTED_PATCHES = [
   "feature:conversation-mode:dictation-endpoint",
   "feature:frameless-titlebar:webview-window-controls-layout",
   "feature:agent-workspace:settings-page",
+  "feature:read-aloud:assistant-runtime",
+  "feature:ui-tweaks:sidebar-project-name-style",
+  "feature:custom-endpoint-marketplace:marketplace-hide-guard",
+  "feature:remote-mobile-control:linux-remote-mobile-app-server-remote-control",
   "feature:remote-mobile-control:linux-remote-control-load-gate",
   "feature:remote-mobile-control:linux-remote-mobile-conversation-hydration",
   "feature:remote-mobile-control:linux-remote-control-status-read-guard",

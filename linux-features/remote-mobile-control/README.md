@@ -1,5 +1,8 @@
 # Experimental Remote Mobile Control
 
+The current shared app-server args constant receives `--remote-control` only
+for Linux Desktop launches.
+
 This feature is disabled by default. It patches the upstream Codex Desktop main
 bundle so Linux can try the remote-control host and outbound control flows that
 upstream currently limits to macOS.

@@ -63,6 +63,8 @@ accepted.
    suppresses the picker, and (when the catalog is readable at build time)
    bakes the catalog into the picker component, the dynamic
    `available_models` config, and the composer/slash-command menu model reads.
+   Custom endpoints also bypass the upstream Ultra rollout gate, so a catalog
+   entry declaring `ultra` exposes both Advanced and Ultra controls.
 3. **Recent-threads webview bundle** — `modelProviders: []` +
    `sourceKinds: []` per the app-server contract (all providers, default
    interactive sources), and filters untitled placeholder rows.

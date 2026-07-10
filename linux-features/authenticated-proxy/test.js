@@ -392,3 +392,12 @@ test("authenticated-proxy tests fail when current desktop fetch shape drifts", (
     /Could not route Linux proxy-auth desktop fetches through ClientRequest|Expected values to be strictly deep-equal/,
   );
 });
+
+test("authenticated-proxy patches the July 2026 desktop fetch shape", () => {
+  const source =
+    'let c=require(`electron`);async function boot(){await c.app.whenReady()}class Fetcher{async performDesktopFetch(){let f=i==null?await c.net.fetch(a,{method:r,headers:n,body:m(),signal:o,credentials:s?`include`:`same-origin`}):await this.performProgressRequest({body:m(),headers:n,method:r,onUploadProgress:i,resolvedUrl:a,signal:o,useSessionCookies:s});return f}performProgressRequest(){let u=c.net.request({method:n,url:i,headers:t,useSessionCookies:o}),d=-1,f=()=>{let e=u.getUploadProgress();!e.started||e.current===d||(d=e.current,r({loaded:e.current,total:e.total}))}}}';
+  const patched = applyPatchTwiceWithoutWarnings(applyAuthenticatedProxyPatch, source);
+  assert.match(patched, /i==null&&!codexLinuxProxyAuthEntry\(\)\?await c\.net\.fetch/);
+  assert.match(patched, /codexLinuxAttachProxyAuthToRequest\(u\)/);
+  assert.match(patched, /if\(r==null\)return/);
+});

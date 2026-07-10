@@ -1273,6 +1273,15 @@ test("open-target discovery patches latest directory mode expression", () => {
   assert.match(patched, /w=f!=null&&codexLinuxOpenTargetIsDirectory\(f\)/);
 });
 
+test("open-target discovery patches the July 2026 directory mode expression", () => {
+  const source =
+    '"open-in-targets":async()=>{let g=d||f!=null&&n.ys(f),_=f!=null&&KA(f),v=f!=null&&JA(f),y=g?await yF(i):_?await vF({filePath:f}):[];return y}';
+  const patched = applyOpenInTargetsDirectoryModePatch(source);
+  assert.match(patched, /w=f!=null&&codexLinuxOpenTargetIsDirectory\(f\)/);
+  assert.match(patched, /g=d\|\|w\|\|f!=null&&n\.ys\(f\)/);
+  assert.equal(applyOpenInTargetsDirectoryModePatch(patched), patched);
+});
+
 test("open-target discovery native selector includes available directory-capable targets", () => {
   const patched = applyPatchTwice(applyNativeOpenTargetSelectionPatch, openTargetSelectionBundle)
     .replace(/export\{[^}]+\};/u, "return {selectTargets:e,selectTarget:t,isEditor:n};");

@@ -8,22 +8,55 @@ const {
 } = require("../../lib/minified-js.js");
 
 function applyBrowserUseNodeReplApprovalPatch(currentSource) {
-  const runtimeFactoryMethods = "vo";
   let patchedSource = currentSource;
   let patchedTrustedHashes = false;
+  const hasBrowserUseRuntimeContext =
+    currentSource.includes("NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S") ||
+    (
+      currentSource.includes("nodeReplPath:") &&
+      currentSource.includes("shouldUseWslPaths:")
+    );
 
+  const destructuredTrustedHashesRegex =
+    /(function [A-Za-z_$][\w$]*\(\{(?:(?!\}\)\{)[\s\S]){0,4000}?trustedBrowserClientSha256s:([A-Za-z_$][\w$]*)(?:=[^,}]+)?(?:(?!\}\)\{)[\s\S]){0,4000}\}\)\{)/g;
   const runtimeFactoryTrustedHashesRegex =
-    new RegExp(String.raw`([A-Za-z_$][\w$]*)\.(${runtimeFactoryMethods})\(\{([^{}]*?trustedBrowserClientSha256s:)(?!codexLinuxTrustedBrowserClientSha256s\()([A-Za-z_$][\w$]*)(,[^{}]*?\})\)`, "g");
+    /(trustedBrowserClientSha256s:)(?!codexLinuxTrustedBrowserClientSha256s\()([A-Za-z_$][\w$]*)(?!\s*=)/g;
   if (
+    hasBrowserUseRuntimeContext &&
     requireName(patchedSource, "node:fs") != null &&
     requireName(patchedSource, "node:path") != null &&
     requireName(patchedSource, "node:crypto") != null
   ) {
     patchedSource = patchedSource.replace(
-      runtimeFactoryTrustedHashesRegex,
-      (match, runtimeFactoryVar, runtimeFactoryMethod, configPrefix, trustedHashesVar, configSuffix) => {
+      destructuredTrustedHashesRegex,
+      (_match, functionPrefix, trustedHashesVar, offset) => {
+        if (
+          patchedSource.startsWith(
+            `${trustedHashesVar}=codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar});`,
+            offset + _match.length,
+          )
+        ) {
+          return _match;
+        }
         patchedTrustedHashes = true;
-        return `${runtimeFactoryVar}.${runtimeFactoryMethod}({${configPrefix}codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar})${configSuffix})`;
+        return `${functionPrefix}${trustedHashesVar}=codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar});`;
+      },
+    );
+    patchedSource = patchedSource.replace(
+      runtimeFactoryTrustedHashesRegex,
+      (_match, configPrefix, trustedHashesVar, offset) => {
+        const factoryContext = patchedSource.slice(Math.max(0, offset - 4000), offset);
+        const factoryTail = patchedSource.slice(offset, offset + 4000);
+        const factoryEnd = factoryTail.indexOf("})");
+        if (
+          !/[A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\(\{[\s\S]*$/.test(factoryContext) ||
+          factoryEnd < 0 ||
+          !factoryTail.slice(0, factoryEnd).includes("shouldUseWslPaths:")
+        ) {
+          return _match;
+        }
+        patchedTrustedHashes = true;
+        return `${configPrefix}codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar})`;
       },
     );
   }

@@ -31,7 +31,7 @@ const pickerPatched =
 const currentPickerFixture =
   'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
 const currentPickerPatched =
-  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=!1,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));__codexLinuxCustomEndpointReasoningFallback:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
+  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let __codexLinuxCustomEndpointUltra=e===`apikey`||e===`apiKey`;i=i||__codexLinuxCustomEndpointUltra;let s=[],c=null,l=!1,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));__codexLinuxCustomEndpointReasoningFallback:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
 const dynamicConfigFixture =
   'function cMt(e){let t=Wu(K()).safeParse(e.available_models),n=zu().safeParse(e.use_hidden_models),r=K().safeParse(e.default_model);return{availableModels:new Set(t.success?t.data:vq),useHiddenModels:n.success?n.data:yq.useHiddenModels,defaultModel:r.success?r.data:yq.defaultModel}}';
 const composerMenuFixture =
@@ -42,15 +42,17 @@ const slashCommandModelFixture =
 const sidebarFixture =
   'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s})}';
 const sidebarPatched =
-  'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s})}';
+  'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s,useStateDbOnly:!0})}';
 const sidebarStateDbOnlyFixture =
   'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s,useStateDbOnly:n})}';
 const sidebarStateDbOnlyPatched =
-  'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s,useStateDbOnly:n})}';
+  'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s,useStateDbOnly:!0})}';
 const currentSidebarFixture =
   'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data;if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:null,archived:!1,sourceKinds:oh,useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
 const currentSidebarPatched =
-  'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data.filter(e=>e.name?.trim());if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:[],archived:!1,sourceKinds:[],useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
+  'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data.filter(e=>e.name?.trim());if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:[],archived:!1,sourceKinds:[],useStateDbOnly:!0};return this.params.requestClient.sendRequest(`thread/list`,r)}';
+const currentSidebarAsset =
+  'app-initial~app-main~hotkey-window-thread-page~thread-app-shell-chrome~header~remote-conver~h59fr3q5-Cm3GYhJA.js';
 
 const mainBundleFixture =
   'var nB=class{async getUserSavedConfiguration(e){return(await this.readConfig({includeLayers:!1,cwd:e??null})).config}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}async startThread(e){}}';
@@ -84,6 +86,14 @@ const catalogFixture = {
       display_name: "GLM 5",
       supported_reasoning_levels: [{ effort: "high" }],
     },
+  ],
+};
+
+const orderedCatalogFixture = {
+  models: [
+    { slug: "cx/gpt-5.6-terra", display_name: "GPT-5.6 Terra", supported_reasoning_levels: [{ effort: "medium" }] },
+    { slug: "cx/gpt-5.6-luna", display_name: "GPT-5.6 Luna", supported_reasoning_levels: [{ effort: "medium" }] },
+    { slug: "cx/gpt-5.5", display_name: "GPT-5.5", supported_reasoning_levels: [{ effort: "medium" }] },
   ],
 };
 
@@ -277,6 +287,33 @@ test("model picker keeps catalog model efforts when enabled-effort filter is emp
   });
 });
 
+test("model picker exposes ultra for a custom endpoint", () => {
+  const patched = applyPatchTwice(applyModelPickerAllowlistPatch, currentPickerFixture);
+  const vbe = vm.runInNewContext(`${patched};vbe`, {
+    pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort),
+  });
+  const result = vbe({
+    authMethod: "apikey",
+    availableModels: new Set(),
+    defaultModel: null,
+    enabledReasoningEfforts: new Set(["medium", "ultra"]),
+    includeUltraReasoningEffort: false,
+    models: [{
+      model: "cx/gpt-5.6-sol",
+      hidden: false,
+      supportedReasoningEfforts: [
+        { reasoningEffort: "medium", description: "Medium" },
+        { reasoningEffort: "ultra", description: "Ultra" },
+      ],
+    }],
+    useHiddenModels: false,
+  });
+  assert.deepEqual(
+    result.models[0].supportedReasoningEfforts.map((effort) => effort.reasoningEffort),
+    ["medium", "ultra"],
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Main-bundle catalog patch
 // ---------------------------------------------------------------------------
@@ -302,7 +339,7 @@ test("main bundle patch merges catalog and normalizes raw provider rows", async 
     client.getUserSavedConfiguration = async () => ({ model_catalog_json: catalogPath, model: "cx/gpt-5.5" });
     const { data } = await client.listModels({});
 
-    assert.deepEqual(Array.from(data, (model) => model.model), ["cx/gpt-5.5", "ocg/raw-slug", "provider-only", "ocg/glm-5"]);
+    assert.deepEqual(Array.from(data, (model) => model.model), ["cx/gpt-5.5", "ocg/glm-5", "ocg/raw-slug", "provider-only"]);
     for (const model of data) {
       assert.ok(Array.isArray(model.supportedReasoningEfforts) && model.supportedReasoningEfforts.length > 0);
     }
@@ -315,6 +352,21 @@ test("main bundle patch merges catalog and normalizes raw provider rows", async 
     assert.equal(rawSlug.displayName, "ocg/raw-slug");
     const providerOnly = data.find((model) => model.model === "provider-only");
     assert.equal(providerOnly.supportedReasoningEfforts[0].description, "Low");
+  });
+});
+
+test("main bundle patch keeps catalog order ahead of provider-only rows", async () => {
+  const patched = applyMainBundleCatalogModelsPatch(mainBundleFixture);
+  await withCatalogCodexHome(orderedCatalogFixture, async (codexHome, catalogPath) => {
+    const client = instantiatePatchedClient(patched);
+    client.ensureReady = async () => {};
+    client.sendInternalRequest = async () => ({ result: { data: [{ model: "provider-only" }] } });
+    client.getUserSavedConfiguration = async () => ({ model_catalog_json: catalogPath });
+    const { data } = await client.listModels({});
+    assert.deepEqual(
+      Array.from(data, (model) => model.model),
+      ["cx/gpt-5.6-terra", "cx/gpt-5.6-luna", "cx/gpt-5.5", "provider-only"],
+    );
   });
 });
 
@@ -459,16 +511,21 @@ test("sidebar provider filter patch applies and is idempotent", () => {
   assert.equal(patched, sidebarPatched);
 });
 
-test("sidebar provider filter patch preserves useStateDbOnly", () => {
+test("sidebar provider filter patch forces useStateDbOnly", () => {
   const patched = applyPatchTwice(applySidebarProviderFilterPatch, sidebarStateDbOnlyFixture);
   assert.equal(patched, sidebarStateDbOnlyPatched);
 });
 
-test("sidebar provider filter patch uses server defaults in async state-DB loader", () => {
+test("sidebar provider filter patch uses local state in async loader", () => {
   const patched = applyPatchTwice(applySidebarProviderFilterPatch, currentSidebarFixture);
   assert.equal(patched, currentSidebarPatched);
   assert.match(patched, /modelProviders:\[\]/);
   assert.match(patched, /sourceKinds:\[\]/);
+});
+
+test("sidebar provider filter targets the current history bundle", () => {
+  const { SIDEBAR_ASSET_PATTERN } = require("./patch.js").internals;
+  assert.match(currentSidebarAsset, SIDEBAR_ASSET_PATTERN);
 });
 
 test("sidebar provider filter patch is idempotent on already-patched async loader", () => {

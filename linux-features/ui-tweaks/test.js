@@ -25,7 +25,7 @@ const {
 function projectBundleFixture() {
   return [
     "function row(){let j=Pn(`group/folder-row group relative flex h-[var(--height-token-row)] text-sm text-token-foreground`);",
-    "let V=(0,Iy.jsx)(`span`,{className:`min-w-0 truncate pr-1`,children:p});return [j,V]}",
+    "let V=(0,Iy.jsx)(`span`,{className:`text-fade-truncate pr-1`,children:p});return [j,V]}",
   ].join("");
 }
 

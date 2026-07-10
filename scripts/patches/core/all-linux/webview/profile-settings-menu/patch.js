@@ -11,7 +11,7 @@ module.exports = [
     phase: "webview-asset",
     order: 1043,
     ciPolicy: "optional",
-    pattern: /^(?:profile-dropdown-.*|app-initial~app-main~automations-page-.*)\.js$/,
+    pattern: /^(?:profile-dropdown-.*|profile-.*|app-initial~app-main~.*(?:profile|automations-page).*).*\.js$/,
     missingDescription: "profile dropdown webview bundle",
     skipDescription: "Linux profile settings menu patch",
     apply: applyLinuxProfileSettingsMenuPatch,

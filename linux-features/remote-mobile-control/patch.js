@@ -52,6 +52,7 @@ const REMOTE_CONTROL_STATUS_READ_GUARD_MARKER = "codexLinuxRemoteControlShouldRe
 const REMOTE_CONTROL_REVOKE_SETUP_RESET_MARKER = "codexLinuxRemoteControlResetMobileSetupAfterRevoke";
 const REMOTE_MOBILE_APP_SERVER_REMOTE_CONTROL_MARKER = "codexLinuxRemoteMobileAppServerArgs";
 const REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE = "args:[`app-server`,`--analytics-default-enabled`]";
+const REMOTE_MOBILE_APP_SERVER_ARGS_ARRAY_NEEDLE = "[`-c`,`features.code_mode_host=true`,`app-server`,`--analytics-default-enabled`]";
 const REMOTE_MOBILE_PROJECTLESS_REMOTE_TASK_MARKER = "codexLinuxRemoteMobileProjectlessRemoteTaskId";
 const REMOTE_CONTROL_SELECTED_TAB_NEEDLE =
   "function rr({selectedConnectionsTab:e,showControlThisMacTab:t,showRemoteControlConnectionsSection:n,showTabbedSshPage:r}){return n?e===`control-this-mac`&&!t||e===`ssh`&&!r?`access-other-devices`:e:`ssh`}";
@@ -458,15 +459,22 @@ function applyLinuxRemoteMobileAppServerRemoteControlPatch(source) {
   if (source.includes(REMOTE_MOBILE_APP_SERVER_REMOTE_CONTROL_MARKER)) {
     return source;
   }
-  if (!source.includes(REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE)) {
+  const needle = source.includes(REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE)
+    ? REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE
+    : source.includes(REMOTE_MOBILE_APP_SERVER_ARGS_ARRAY_NEEDLE)
+      ? REMOTE_MOBILE_APP_SERVER_ARGS_ARRAY_NEEDLE
+      : null;
+  if (needle == null) {
     return source;
   }
 
   const helper =
-    "function codexLinuxRemoteMobileAppServerArgs(){return process.platform===`linux`?[`app-server`,`--remote-control`,`--analytics-default-enabled`]:[`app-server`,`--analytics-default-enabled`]}";
+    needle === REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE
+      ? "function codexLinuxRemoteMobileAppServerArgs(){return process.platform===`linux`?[`app-server`,`--remote-control`,`--analytics-default-enabled`]:[`app-server`,`--analytics-default-enabled`]}"
+      : "function codexLinuxRemoteMobileAppServerArgs(){return process.platform===`linux`?[`-c`,`features.code_mode_host=true`,`app-server`,`--remote-control`,`--analytics-default-enabled`]:[`-c`,`features.code_mode_host=true`,`app-server`,`--analytics-default-enabled`]}";
   const replaced = source
-    .split(REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE)
-    .join("args:codexLinuxRemoteMobileAppServerArgs()");
+    .split(needle)
+    .join(needle === REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE ? "args:codexLinuxRemoteMobileAppServerArgs()" : "codexLinuxRemoteMobileAppServerArgs()");
   // Insert after a leading "use strict" so prepending the helper does not
   // demote the directive to a plain expression and de-strict the bundle.
   const insertAt = replaced.startsWith('"use strict";')
@@ -497,6 +505,7 @@ function applyLinuxRemoteMobileAppServerRemoteControlExtractedAppPatch(extracted
     const source = fs.readFileSync(filePath, "utf8");
     if (
       !source.includes(REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE) &&
+      !source.includes(REMOTE_MOBILE_APP_SERVER_ARGS_ARRAY_NEEDLE) &&
       !source.includes(REMOTE_MOBILE_APP_SERVER_REMOTE_CONTROL_MARKER)
     ) {
       continue;
@@ -1617,7 +1626,7 @@ module.exports = [
   {
     id: "linux-remote-control-load-gate",
     phase: "webview-asset",
-    pattern: /^(?:remote-connection-visibility|app-initial~app-main~.*(?:remote-conversation-page|automations-page)).*\.js$/,
+    pattern: /^(?:remote-connection-visibility|app-initial~app-main~.*(?:remote-conversation-page|automations-page|thread-app-shell-chrome|page)).*\.js$/,
     order: 20_118,
     ciPolicy: "optional",
     missingDescription: "remote-control loader gate bundle",
@@ -1747,7 +1756,7 @@ module.exports = [
   {
     id: "linux-remote-mobile-projectless-remote-task",
     phase: "webview-asset",
-    pattern: /^(?:sidebar-project-groups|app-initial~app-main~.*remote-conversation-page~new-thread-panel-page.*|app-initial~app-main~remote-conversation-page~new-thread-panel-page~onboarding-page~appgen-~.*)\.js$/,
+    pattern: /^(?:sidebar-project-groups|app-initial~app-main~.*(?:remote-conversation-page|new-thread-panel-page|projects-index-page|page).*|app-initial~app-main~remote-conversation-page~new-thread-panel-page~onboarding-page~appgen-~.*)\.js$/,
     order: 20_170,
     ciPolicy: "optional",
     missingDescription: "sidebar project groups bundle",

@@ -133,7 +133,20 @@ function applyLinuxTrayPatch(currentSource, iconPathExpression) {
           `for(let ${iconPathVar} of ${candidatesVar}){let ${imageVar}=${electronAlias}.nativeImage.createFromPath(${iconPathVar});if(!${imageVar}.isEmpty())return{defaultIcon:${imageVar},chronicleRunningIcon:null}}if(process.platform===\`linux\`){let __codexLinuxTrayIcon=${electronAlias}.nativeImage.createFromPath(${packagedTrayIconPathExpression});if(!__codexLinuxTrayIcon.isEmpty())return{defaultIcon:__codexLinuxTrayIcon,chronicleRunningIcon:null};let __codexLinuxAppIcon=${electronAlias}.nativeImage.createFromPath(${packagedAppIconPathExpression});if(!__codexLinuxAppIcon.isEmpty())return{defaultIcon:__codexLinuxAppIcon,chronicleRunningIcon:null};let __codexLinuxUpstreamTrayIcon=${electronAlias}.nativeImage.createFromPath(${iconPathExpression});if(!__codexLinuxUpstreamTrayIcon.isEmpty())return{defaultIcon:__codexLinuxUpstreamTrayIcon,chronicleRunningIcon:null}}return{defaultIcon:await ${electronAlias}.app.getFileIcon(process.execPath,{size:${sizeExpression}}),chronicleRunningIcon:null}}`,
       );
     } else {
-      console.warn("WARN: Could not find tray icon fallback — skipping Linux tray icon patch");
+      const currentTrayResolverRegex =
+        /return ([A-Za-z_$][\w$]*)==null\?\{defaultIcon:await ([A-Za-z_$][\w$]*)\.app\.getFileIcon\(process\.execPath,\{size:`small`\}\),chronicleRunningIcon:null\}:\{defaultIcon:\1,chronicleRunningIcon:null\}/;
+      const currentTrayResolverMatch = patchedSource.match(currentTrayResolverRegex);
+      if (currentTrayResolverMatch != null) {
+        const [, resolvedIconVar, electronAlias] = currentTrayResolverMatch;
+        const linuxFallback =
+          `if(process.platform===\`linux\`){let __codexLinuxTrayIcon=${electronAlias}.nativeImage.createFromPath(${packagedTrayIconPathExpression});if(!__codexLinuxTrayIcon.isEmpty())return{defaultIcon:__codexLinuxTrayIcon,chronicleRunningIcon:null};let __codexLinuxAppIcon=${electronAlias}.nativeImage.createFromPath(${packagedAppIconPathExpression});if(!__codexLinuxAppIcon.isEmpty())return{defaultIcon:__codexLinuxAppIcon,chronicleRunningIcon:null};let __codexLinuxUpstreamTrayIcon=${electronAlias}.nativeImage.createFromPath(${iconPathExpression});if(!__codexLinuxUpstreamTrayIcon.isEmpty())return{defaultIcon:__codexLinuxUpstreamTrayIcon,chronicleRunningIcon:null}}`;
+        patchedSource = patchedSource.replace(
+          currentTrayResolverRegex,
+          `${linuxFallback}return ${resolvedIconVar}==null?{defaultIcon:await ${electronAlias}.app.getFileIcon(process.execPath,{size:\`small\`}),chronicleRunningIcon:null}:{defaultIcon:${resolvedIconVar},chronicleRunningIcon:null}`,
+        );
+      } else {
+        console.warn("WARN: Could not find tray icon fallback — skipping Linux tray icon patch");
+      }
     }
   }
 

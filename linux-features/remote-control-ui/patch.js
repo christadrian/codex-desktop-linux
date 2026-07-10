@@ -93,7 +93,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20500,
       ciPolicy: "optional",
-      pattern: /^(?:remote-connection-visibility|app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page).*\.js$/,
+      pattern: /^(?:remote-connection-visibility|app-initial~app-main~.*(?:remote-conversation|new-thread-panel|thread-app-shell-chrome)).*\.js$/,
       missingDescription: "remote connection visibility bundle",
       skipDescription: "remote control UI remote connections visibility patch",
       apply: applyRemoteConnectionsVisibilityPatch,

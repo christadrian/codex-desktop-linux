@@ -1604,6 +1604,13 @@ test("settings asset patches add navigation, route, visibility, and title", () =
   assert.doesNotMatch(appMain, new RegExp(`"${SETTINGS_SLUG}":Icon`));
   assert.equal(applyAgentWorkspaceSettingsIndexPatch(appMain), appMain);
 
+  const currentAppMain = applyAgentWorkspaceSettingsIndexPatch(
+    'var routes={"general-settings":BN(async()=>(await Y(async()=>{let{GeneralSettings:e}=await import(`./general-settings-current.js`);return{GeneralSettings:e}},deps,import.meta.url)).GeneralSettings)};',
+  );
+  assert.match(currentAppMain, new RegExp(SETTINGS_ASSET));
+  assert.match(currentAppMain, /\.AgentWorkspacesSettings/);
+  assert.equal(applyAgentWorkspaceSettingsIndexPatch(currentAppMain), currentAppMain);
+
   const settingsPage = applyAgentWorkspaceSettingsPagePatch(
     [
       'var Hn={"linux-desktop":S,"general-settings":S,"local-environments":ln,worktrees:F,environments:ln,"mcp-settings":S,connections:S};',

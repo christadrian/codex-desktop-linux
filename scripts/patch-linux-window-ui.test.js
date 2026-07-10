@@ -37,6 +37,7 @@ const {
   keybindsSettingsAsset,
   linuxDesktopSettingsAsset,
   applyLinuxDesktopSettingsIndexPatch,
+  applyLinuxDesktopSettingsRoutePatch,
   applyLinuxDesktopSettingsSectionsPatch,
   applyLinuxDesktopSettingsSharedPatch,
   patchKeybindsSettingsAssets,
@@ -3005,6 +3006,30 @@ test("forces Linux primary BrowserWindow to be focusable for current boolean min
   assert.doesNotMatch(patched, /focusable:!1,webPreferences:k/);
 });
 
+test("forces Linux primary BrowserWindow focusability for current spread options", () => {
+  const source = [
+    "async createWindow(e={}){let{title:t,width:r=1280,height:i=820,appearance:o=`primary`,show:s=!0,parent:f,focusable:m}=e,g=Date.now(),M=new c.BrowserWindow({width:r,height:i,title:t??c.app.getName(),show:s,parent:f,...m===void 0?{}:{focusable:m},...process.platform===`win32`||process.platform===`linux`?{autoHideMenuBar:!0}:{},webPreferences:k});}",
+  ].join("");
+
+  const { value: patched, warnings } = captureWarns(() =>
+    applyPatchTwice(applyLinuxWindowOptionsPatch, source, null),
+  );
+
+  assert.deepEqual(warnings, []);
+  assert.match(
+    patched,
+    /\.\.\.process\.platform===`linux`&&o===`primary`\?\{focusable:!0\}:m===void 0\?\{\}:\{focusable:m\}/,
+  );
+});
+
+test("accepts the current upstream Linux titlebar appearance branch", () => {
+  const source =
+    "case`quickChat`:case`primary`:return n===`darwin`?{}:n===`win32`||n===`linux`?{titleBarStyle:`hidden`,titleBarOverlay:j9(r),...e===`quickChat`?{resizable:!0}: {}}:{titleBarStyle:`default`};";
+  const { value: patched, warnings } = captureWarns(() => applyLinuxNativeTitlebarPatch(source));
+  assert.equal(patched, source);
+  assert.deepEqual(warnings, []);
+});
+
 test("keeps focusable destructuring valid while patching current boolean minified shape", () => {
   const source = [
     "async createWindow(e={}){let{title:n,width:i=1280,height:o=820,appearance:c=`primary`,",
@@ -3170,6 +3195,21 @@ test("adds Linux tray icon fallback when current upstream uses small file icon f
   assert.deepEqual(warnings, []);
   assert.match(patched, /__codexLinuxTrayIcon=n\.nativeImage\.createFromPath/);
   assert.match(patched, /n\.app\.getFileIcon\(process\.execPath,\{size:`small`\}\)/);
+});
+
+test("adds Linux tray icon fallback to the current split resolver shape", () => {
+  const iconPathExpression = "process.resourcesPath+`/../content/webview/assets/app-test.png`";
+  const source =
+    "function K9(){return null}async function Ww(){let r=K9();return r==null?{defaultIcon:await c.app.getFileIcon(process.execPath,{size:`small`}),chronicleRunningIcon:null}:{defaultIcon:r,chronicleRunningIcon:null}}";
+  const { value: patched, warnings } = captureWarns(() =>
+    applyPatchTwice(applyLinuxTrayPatch, source, iconPathExpression),
+  );
+  assert.equal(
+    warnings.some((warning) => warning.includes("tray icon fallback")),
+    false,
+  );
+  assert.match(patched, /__codexLinuxTrayIcon=c\.nativeImage\.createFromPath/);
+  assert.match(patched, /__codexLinuxUpstreamTrayIcon=c\.nativeImage\.createFromPath\(process\.resourcesPath\+`\/\.\.\/content\/webview\/assets\/app-test\.png`\)/);
 });
 
 test("adds Linux tray support even when About dialog already uses the bundled icon path", () => {
@@ -4202,6 +4242,18 @@ test("adds Linux desktop settings route when upstream owns Keyboard Shortcuts", 
   assert.doesNotMatch(patched, /codexLinuxKeybindOverridesRuntime/);
 });
 
+test("adds Linux desktop settings route to current async wrapper map", () => {
+  const source =
+    'var jY={"general-settings":BN(async()=>(await Y(async()=>{let{GeneralSettings:e}=await import(`./general-settings-A.js`);return{GeneralSettings:e}},[],import.meta.url)).GeneralSettings),profile:BN(async()=>null)};';
+
+  const patched = applyPatchTwice(applyLinuxDesktopSettingsRoutePatch, source);
+
+  assert.match(
+    patched,
+    /"linux-desktop":BN\(async\(\)=>\(await import\(`\.\/linux-desktop-settings-linux\.js`\)\)\.LinuxDesktopSettings\)/,
+  );
+});
+
 test("finds a unique current Codex request API asset outside legacy vscode-api chunks", () => {
   const extractedDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-request-api-"));
   const assetsDir = path.join(extractedDir, "webview", "assets");
@@ -4314,6 +4366,30 @@ test("keeps Linux desktop toggles visible with native Keyboard Shortcuts", () =>
     const secondResult = patchKeybindsSettingsAssets(extractedDir);
     assert.equal(secondResult.matched, true);
     assert.equal(secondResult.changed, 0);
+  } finally {
+    fs.rmSync(extractedDir, { recursive: true, force: true });
+  }
+});
+
+test("finds current combined Keyboard Shortcuts settings chunks", () => {
+  const { extractedDir, assetsDir } = createNativeKeyboardShortcutsSettingsFixture();
+  try {
+    const oldPath = path.join(assetsDir, "keyboard-shortcuts-settings-A.js");
+    const combinedPath = path.join(
+      assetsDir,
+      "app-initial~app-main~codex-micro-settings~keyboard-shortcuts-settings-A.js",
+    );
+    fs.writeFileSync(
+      combinedPath,
+      `${fs.readFileSync(oldPath, "utf8")}settings.keyboardShortcuts.search.placeholder`,
+      "utf8",
+    );
+    fs.rmSync(oldPath);
+
+    const result = patchKeybindsSettingsAssets(extractedDir);
+
+    assert.equal(result.matched, true);
+    assert.equal(fs.existsSync(path.join(assetsDir, linuxDesktopSettingsAsset)), true);
   } finally {
     fs.rmSync(extractedDir, { recursive: true, force: true });
   }
@@ -4702,7 +4778,7 @@ test("keeps local environment action modal inputs editable inside stored modal c
 test("keeps local environment action modal inputs editable after component alias drift", () => {
   const source = [
     "function Existing(){return (0,Z.useState)(!1)}",
-    "function lf(e){let t=(0,X.c)(101),{action:n,configPath:r,environment:i,hostConfig:a,onOpenSettings:o,onRunAction:s,onSaved:c,onUpdate:l,workspaceRoot:u}=e,d=on(),f=v(),p=w(`local-environment-config-save`),g,y,j;if(t[0]!==n||t[7]!==l){let label={id:`threadPage.runAction.setup.commandLabel`},desc={id:`settings.localEnvironments.actions.add.description`},A={ariaLabel:`a`,icon:null,value:n.icon},N=`local`,P=n.name.trim(),F=P,I=n.command.trim(),L=I;y=F.length===0||L.length===0||p.isPending,g=`local-env-action-name-${n.id}`;let R;t[36]!==n?(R=e=>{if(e.preventDefault(),y)return;let t=i.environment,o={...n,command:L,name:F},l={command:L,icon:n.icon,name:F,...n.platform?{platform:n.platform}:{}},d=mu({actions:[...vu(t.actions??[]),o]});p.mutate({configPath:r,hostId:a.id,raw:d},{onSuccess:()=>{c(),s(l)}})},t[36]=n,t[49]=R):R=t[49],j=n.command;let z=e=>{l({icon:e.value})},M=e=>{l({name:e.target.value})},V=e=>{l({command:e})};return {label,desc,g,j,z,M,V}}return null}",
+    "function lf(e){let t=(0,X.c)(101),{action:n,configPath:r,environment:i,hostConfig:a,onOpenSettings:o,onRunAction:s,onSaved:c,onUpdate:l,workspaceRoot:u}=e,d=on(),f=v(),p=w(`local-environment-config-save`),g,y,j;if(t[6]!==n||t[7]!==l){let label={id:`threadPage.runAction.setup.commandLabel`},desc={id:`settings.localEnvironments.actions.add.description`},A={ariaLabel:`a`,icon:null,value:n.icon},N=`local`,P=n.name.trim(),F=P,I=n.command.trim(),L=I;y=F.length===0||L.length===0||p.isPending,g=`local-env-action-name-${n.id}`;let R;t[36]!==n?(R=e=>{if(e.preventDefault(),y)return;let t=i.environment,o={...n,command:L,name:F},l={command:L,icon:n.icon,name:F,...n.platform?{platform:n.platform}:{}},d=mu({actions:[...vu(t.actions??[]),o]});p.mutate({configPath:r,hostId:a.id,raw:d},{onSuccess:()=>{c(),s(l)}})},t[36]=n,t[49]=R):R=t[49],j=n.command;let z=e=>{l({icon:e.value})},M=e=>{l({name:e.target.value})},V=e=>{l({command:e})};return {label,desc,g,j,z,M,V}}return null}",
   ].join("");
 
   const { value: patched, warnings } = captureWarns(() =>
@@ -4714,6 +4790,7 @@ test("keeps local environment action modal inputs editable after component alias
   assert.match(patched, /\{\.\.\.codexLinuxActionDraft,command:L,name:F\}/);
   assert.match(patched, /codexLinuxActionDraft\.name\.trim\(\)/);
   assert.match(patched, /codexLinuxUpdateActionDraft\(\{command:e\}\)/);
+  assert.match(patched, /t\[6\]!==codexLinuxActionDraft\|\|t\[6\]!==n/);
 });
 
 test("skips local environment action modal patch when a critical replacement needle drifts", () => {
@@ -4827,13 +4904,35 @@ test("shows the profile dropdown settings route on Linux", () => {
 
 test("keeps automation_update eager in dynamic tools built during thread start", () => {
   const source =
-    "async function pUt(){return[{type:`namespace`,name:cX,description:`Tools provided by the Codex app.`,tools:[...h?[_ee()]:[],...[],...i?.open_in_codex===!0?[TBt]:[],...h&&d?[SBt]:[],lu,...h&&y?[Ra]:[],...[],...g?AHt({availableHandoffHosts:e,availableModels:b,crossHostHandoffEnabled:n,forkThreadEnabled:!0}):[],...h&&_?[PBt,FBt]:[],...m===`conversational_onboarding`?[yoe]:[],...v&&m!==`conversational_onboarding`?[...vee,bu]:[]].map(e=>({type:`function`,...e,..._Ut.has(e.name)?{}:{deferLoading:!0}}))}]}async sendRequest(e,t,n){if(e===`config/read`)return this.sendConfigReadRequest(t,n);let{request:r,promise:i}=this.createRequest(e,t,n);return i}";
+    "let automationName=`automation_update`;async function pUt(){return[{type:`namespace`,name:cX,description:`Tools provided by the Codex app.`,tools:[...h?[_ee()]:[],...[],...i?.open_in_codex===!0?[TBt]:[],...h&&d?[SBt]:[],lu,...h&&y?[Ra]:[],...[],...g?AHt({availableHandoffHosts:e,availableModels:b,crossHostHandoffEnabled:n,forkThreadEnabled:!0}):[],...h&&_?[PBt,FBt]:[],...m===`conversational_onboarding`?[yoe]:[],...v&&m!==`conversational_onboarding`?[...vee,bu]:[]].map(e=>({type:`function`,...e,..._Ut.has(e.name)?{}:{deferLoading:!0}}))}]}async sendRequest(e,t,n){if(e===`config/read`)return this.sendConfigReadRequest(t,n);let{request:r,promise:i}=this.createRequest(e,t,n);return i}";
 
   const patched = applyPatchTwice(applyAutomationUpdateEagerToolPatch, source);
 
-  assert.match(patched, /e\.name===`automation_update`&&delete t\.deferLoading/);
+  assert.match(
+    patched,
+    /e\.name===`automation_update`&&delete codexLinuxAutomationTool\.deferLoading/,
+  );
   assert.match(patched, /\{deferLoading:!0\}/);
   assert.doesNotMatch(patched, /codex-linux-automation-dynamic-tools-diagnostics/);
+});
+
+test("keeps automation_update eager after current dynamic tool aliases drift", () => {
+  const source =
+    "let automationName=`automation_update`,E=[Sm].map(e=>({type:`function`,...e,...FMe.has(e.name)?{}:{deferLoading:!0}}));";
+
+  const patched = applyPatchTwice(applyAutomationUpdateEagerToolPatch, source);
+
+  assert.match(
+    patched,
+    /FMe\.has\(e\.name\).+e\.name===`automation_update`&&delete codexLinuxAutomationTool\.deferLoading/,
+  );
+});
+
+test("does not rewrite unrelated deferred dynamic tool maps", () => {
+  const source =
+    "let tools=[pluginTool].map(e=>({type:`function`,...e,...eagerTools.has(e.name)?{}:{deferLoading:!0}}));";
+
+  assert.equal(applyAutomationUpdateEagerToolPatch(source), source);
 });
 
 test("removes unsupported features from default app-server feature sync", () => {
@@ -5366,6 +5465,8 @@ test("recovers completed stream items that arrive after local state lost their s
   const patched = applyPatchTwice(applyLinuxCompletedItemRecoveryPatch, source);
 
   assert.match(patched, /codexLinuxCompletedItemExists=n\.items\.some\(e=>e\.id===s\.id\)/);
+  assert.doesNotMatch(patched, /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\}\);let codexLinuxCompletedItemExists/);
+  assert.match(patched, /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\);let codexLinuxCompletedItemExists/);
   assert.match(
     patched,
     /if\(e\.type!==`subAgentActivity`&&codexLinuxCompletedItemExists&&!LB\(n,e\.id,e\.type\)\)return;bP\(n,s\)/,
@@ -5419,6 +5520,8 @@ test("recovers completed stream items in current minified completion bundle", ()
   const patched = applyPatchTwice(applyLinuxCompletedItemRecoveryPatch, source);
 
   assert.match(patched, /codexLinuxCompletedItemExists=n\.items\.some\(e=>e\.id===s\.id\)/);
+  assert.doesNotMatch(patched, /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\}\);let codexLinuxCompletedItemExists/);
+  assert.match(patched, /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\);let codexLinuxCompletedItemExists/);
   assert.match(
     patched,
     /if\(e\.type!==`subAgentActivity`&&codexLinuxCompletedItemExists&&!LB\(n,e\.id,e\.type\)\)return;bP\(n,s\)/,
@@ -5427,6 +5530,18 @@ test("recovers completed stream items in current minified completion bundle", ()
     patched,
     /!\(e\.type!==`subAgentActivity`&&!LB\(n,e\.id,e\.type\)\)&&\(e\.type,bP\(n,s\)\)/,
   );
+});
+
+test("repairs a malformed completed-item recovery patch from an interrupted rebuild", () => {
+  const malformed =
+    "function apply(e,n){return yV(e)&&(n.firstTurnWorkItemStartedAtMs=n.firstTurnWorkItemStartedAtMs??Date.now()});let codexLinuxCompletedItemExists=n.items.some(e=>e.id===s.id)}";
+  const repaired = applyLinuxCompletedItemRecoveryPatch(malformed);
+
+  assert.match(
+    repaired,
+    /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\);let codexLinuxCompletedItemExists/,
+  );
+  assert.doesNotMatch(repaired, /Date\.now\(\)\}\);let codexLinuxCompletedItemExists/);
 });
 
 test("treats empty active runtime status as stale once response rendering has completed", () => {
@@ -6043,6 +6158,20 @@ test("auto-installs the current Chrome plugin gate shape", () => {
   assert.equal((patched.match(/installWhenMissing:!0,name:ut/g) || []).length, 1);
   assert.equal((patched.match(/installWhenMissing:!0,name:dt/g) || []).length, 0);
   assert.equal((patched.match(/installWhenMissing:!0,name:xt/g) || []).length, 0);
+});
+
+test("auto-installs the current namespace Chrome plugin gate", () => {
+  const source =
+    "var bs=[{name:o.s,isAvailable:({buildFlavor:e,env:t,features:n})=>o.i(e,t)&&n.externalBrowserUseAllowed},{name:n.Cs,isAvailable:({buildFlavor:e,env:t,features:n})=>o.a(e,t)&&n.externalBrowserUseAllowed},{name:o.c,isAvailable:({buildFlavor:e,features:t})=>t.externalBrowserUseAllowed&&o.o(e)}];let chrome=`chrome`;";
+
+  const patched = applyPatchTwice(applyLinuxChromePluginAutoInstallPatch, source);
+
+  assert.match(
+    patched,
+    /installWhenMissing:!0,name:o\.c,isAvailable:\(\{buildFlavor:e,features:t\}\)=>process\.platform===`linux`\|\|\(t\.externalBrowserUseAllowed&&o\.o\(e\)\)/,
+  );
+  assert.doesNotMatch(patched, /installWhenMissing:!0,name:o\.s/);
+  assert.doesNotMatch(patched, /installWhenMissing:!0,name:n\.Cs/);
 });
 
 test("uses Linux managed runtime paths for Chrome native host sync", () => {
@@ -7060,6 +7189,48 @@ test("trusts the current vo Browser Use node_repl runtime config builder", () =>
   );
 });
 
+test("trusts the current Mo Browser Use config with nested environment spreads", () => {
+  const source =
+    "\"use strict\";let l=require(`node:fs`),s=require(`node:path`),u=require(`node:crypto`),d=[`upstream-hash`],n={Mo:e=>e},b={A:1},H=e=>e,Ny=[];H({nodeReplPath:Ny,trustedBrowserClientSha256s:Ny});function build(){return n.Mo({extraEnv:{...b},nodeReplPath:null,trustedBrowserClientSha256s:d,shouldUseWslPaths:!1})}";
+
+  const patched = applyPatchTwice(applyBrowserUseNodeReplApprovalPatch, source);
+
+  assert.match(
+    patched,
+    /trustedBrowserClientSha256s:codexLinuxTrustedBrowserClientSha256s\(d\)/,
+  );
+  assert.match(patched, /H\(\{nodeReplPath:Ny,trustedBrowserClientSha256s:Ny\}\)/);
+  assert.doesNotThrow(() => new Function(patched));
+});
+
+test("keeps the current destructured Browser Use hash default syntactically valid", () => {
+  const source =
+    "\"use strict\";let l=require(`node:fs`),s=require(`node:path`),u=require(`node:crypto`);function ky({nodeReplPath:a,platform:o,trustedBrowserClientSha256s:d=[],shouldUseWslPaths:f}){return d.length>0?d.join(`,`):``}";
+
+  const patched = applyPatchTwice(applyBrowserUseNodeReplApprovalPatch, source);
+
+  assert.match(
+    patched,
+    /\}\)\{d=codexLinuxTrustedBrowserClientSha256s\(d\);return d\.length/,
+  );
+  assert.doesNotMatch(patched, /trustedBrowserClientSha256s:codexLinuxTrustedBrowserClientSha256s/);
+  assert.doesNotThrow(() => new Function(patched));
+});
+
+test("keeps the current non-default destructured Browser Use hash syntactically valid", () => {
+  const source =
+    "\"use strict\";let l=require(`node:fs`),s=require(`node:path`),u=require(`node:crypto`);function Dr({nodeReplPath:a,platform:o,shouldUseWslPaths:f,trustedBrowserClientSha256s:d}){return d.length>0?d.join(`,`):``}";
+
+  const patched = applyPatchTwice(applyBrowserUseNodeReplApprovalPatch, source);
+
+  assert.match(
+    patched,
+    /\}\)\{d=codexLinuxTrustedBrowserClientSha256s\(d\);return d\.length/,
+  );
+  assert.doesNotMatch(patched, /trustedBrowserClientSha256s:codexLinuxTrustedBrowserClientSha256s/);
+  assert.doesNotThrow(() => new Function(patched));
+});
+
 test("patches re-chunked Browser Use trust hash and approval assets", () => {
   const extractedDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-browser-rechunked-"));
   try {
@@ -7092,6 +7263,13 @@ test("patches re-chunked Browser Use trust hash and approval assets", () => {
   } finally {
     fs.rmSync(extractedDir, { recursive: true, force: true });
   }
+});
+
+test("does not rewrite unrelated trusted hash configuration", () => {
+  const source =
+    "\"use strict\";let l=require(`node:fs`),s=require(`node:path`),u=require(`node:crypto`),d=[`upstream-hash`];let config={trustedBrowserClientSha256s:d};";
+
+  assert.equal(applyBrowserUseNodeReplApprovalPatch(source), source);
 });
 
 test("trusts Linux patched bundled Browser Use clients through the current vo config builder", () => {

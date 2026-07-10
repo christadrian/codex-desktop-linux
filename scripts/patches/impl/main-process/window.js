@@ -97,7 +97,7 @@ function applyDefinedBrowserWindowOptionsPatch(currentSource) {
 }
 
 function findCreateWindowAppearanceAlias(currentSource, matchIndex) {
-  const prefix = currentSource.slice(Math.max(0, matchIndex - 3000), matchIndex);
+  const prefix = currentSource.slice(Math.max(0, matchIndex - 10000), matchIndex);
   const createWindowRegex =
     /createWindow\([^)]*\)\{let\{[^}]*appearance:([A-Za-z_$][\w$]*)(?:=[^,}]+)?/g;
   let match;
@@ -124,9 +124,22 @@ function applyLinuxPrimaryFocusablePatch(currentSource) {
 
   let patchedAny = false;
   let skippedAny = false;
+  let patchedSource = currentSource;
+  const currentPrimaryFocusableSpreadRegex =
+    /async createWindow\([^)]*\)\{let\{[^}]*appearance:([A-Za-z_$][\w$]*)[^}]*\}=[\s\S]{0,4000}?(\.\.\.([A-Za-z_$][\w$]*)===void 0\?\{\}:\{focusable:\3\},)/;
+  patchedSource = patchedSource.replace(
+    currentPrimaryFocusableSpreadRegex,
+    (match, appearanceAlias, spreadText) => {
+      patchedAny = true;
+      return match.replace(
+        spreadText,
+        `...process.platform===\`linux\`&&${appearanceAlias}===\`primary\`?{focusable:!0}:${spreadText.slice(3)}`,
+      );
+    },
+  );
   const focusableSpreadRegex =
     /\.\.\.([A-Za-z_$][\w$]*)==null\?\{\}:\{focusable:\1\},(\.\.\.process\.platform===`win32`\?)/g;
-  let patchedSource = currentSource.replace(
+  patchedSource = patchedSource.replace(
     focusableSpreadRegex,
     (match, focusableAlias, platformOptions, offset) => {
       const appearanceAlias = findCreateWindowAppearanceAlias(currentSource, offset);
@@ -156,6 +169,24 @@ function applyLinuxPrimaryFocusablePatch(currentSource) {
       return (
         `focusable:process.platform===\`linux\`&&${appearanceAlias}===\`primary\`?!0:` +
         `${focusableAlias},${platformOptions}`
+      );
+    },
+  );
+
+  const focusableSpreadCurrentRegex =
+    /\.\.\.([A-Za-z_$][\w$]*)===void 0\?\{\}:\{focusable:\1\},(\.\.\.process\.platform===`win32`\|\|process\.platform===`linux`\?\{autoHideMenuBar:!0\}:\{\},)/g;
+  patchedSource = patchedSource.replace(
+    focusableSpreadCurrentRegex,
+    (match, focusableAlias, platformOptions, offset) => {
+      const appearanceAlias = findCreateWindowAppearanceAlias(currentSource, offset);
+      if (appearanceAlias == null) {
+        skippedAny = true;
+        return match;
+      }
+      patchedAny = true;
+      return (
+        `...process.platform===\`linux\`&&${appearanceAlias}===\`primary\`?{focusable:!0}:` +
+        `...${focusableAlias}===void 0?{}:{focusable:${focusableAlias}},${platformOptions}`
       );
     },
   );
@@ -202,6 +233,18 @@ function applyLinuxNativeTitlebarPatch(currentSource) {
       '\\*[A-Za-z_$][\\w$]*\\)\\}\\}',
   );
   const helperFunctionMatch = currentSource.match(helperFunctionRegex);
+
+  // Recent upstream already ships the Linux titlebar branch in the shared
+  // primary/quick-chat appearance table. It uses the new spread-based shape
+  // and the upstream overlay helper, so there is no compatibility work left
+  // for this patch to apply.
+  if (
+    /case`quickChat`:case`primary`:return[\s\S]{0,1800}?===`win32`\|\|[A-Za-z_$][\w$]*===`linux`\?\{titleBarStyle:`hidden`,titleBarOverlay:[A-Za-z_$][\w$]*\(/.test(
+      currentSource,
+    )
+  ) {
+    return currentSource;
+  }
 
   const primaryTitlebarRegex =
     /case`primary`:return ([A-Za-z_$][\w$]*)===`darwin`\?([A-Za-z_$][\w$]*)\?\{titleBarStyle:`hiddenInset`,trafficLightPosition:([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\}:\{vibrancy:`menu`,titleBarStyle:`hiddenInset`,trafficLightPosition:\3\(\4\)\}:\1===`win32`(\|\|\1===`linux`)?\?\{titleBarStyle:`hidden`,titleBarOverlay:([A-Za-z_$][\w$]*)\(\4\)\}:\{titleBarStyle:`default`\};/g;

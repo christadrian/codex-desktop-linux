@@ -74,6 +74,7 @@ Config keys:
   syntax that could escape the scoped rule warns and falls back to the default.
   The default is `font-weight: 700 !important; padding-top: 0.25rem;`, so
   project names are bold with a small top offset and no color is forced.
+  The selector follows the current `text-fade-truncate` project-name element.
 
 ## Drift Behavior
 
@@ -91,4 +92,5 @@ Run the feature tests with:
 
 ```bash
 node --test linux-features/ui-tweaks/test.js
+node linux-features/ui-tweaks/eval.js
 ```

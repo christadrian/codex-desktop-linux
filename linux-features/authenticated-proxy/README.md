@@ -1,5 +1,8 @@
 # Authenticated Proxy
 
+Current desktop fetch aliases are patched so authenticated proxy requests use
+Electron `ClientRequest`.
+
 Opt-in support for HTTP proxies that require username/password authentication.
 Chromium does not accept `user:password@` credentials inside the proxy list
 passed through `--proxy-server`, so this feature keeps the proxy endpoint and

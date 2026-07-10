@@ -15,9 +15,14 @@ function hasChromePluginLiteral(source) {
   return /(?:`chrome`|"chrome"|'chrome')/.test(source);
 }
 
-function isChromeNameExpr(nameExpr, chromeNameVar) {
+function isChromeNameExpr(nameExpr, chromeNameVar, paramsText, expression) {
   return /^(?:`chrome`|"chrome"|'chrome')$/.test(nameExpr) ||
-    nameExpr === chromeNameVar;
+    nameExpr === chromeNameVar ||
+    (
+      /^[A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*$/.test(nameExpr) &&
+      !paramsText.includes("env:") &&
+      expression.includes("externalBrowserUseAllowed")
+    );
 }
 
 function chromeNamePatterns(chromeNameVar) {
@@ -48,7 +53,7 @@ function applyLinuxChromePluginAutoInstallPatch(currentSource) {
   }
 
   const chromeNameVar = currentSource.match(/([A-Za-z_$][\w$]*)=(?:`chrome`|"chrome"|'chrome')/)?.[1] ?? null;
-  const nameExpressionPattern = String.raw`(?:[A-Za-z_$][\w$]*|` +
+  const nameExpressionPattern = String.raw`(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?|` +
     String.raw`\`chrome\`|"chrome"|'chrome')`;
   const gateRegex =
     new RegExp(
@@ -71,7 +76,7 @@ function applyLinuxChromePluginAutoInstallPatch(currentSource) {
       expression,
       migrateSuffix = "",
     ) => {
-      if (!isChromeNameExpr(nameExpr, chromeNameVar)) {
+      if (!isChromeNameExpr(nameExpr, chromeNameVar, paramsText, expression)) {
         return gateSource;
       }
 

@@ -19,6 +19,8 @@ const PICKER_WEBVIEW_NEEDLE = /(function \w+\(\{authMethod:\w+,availableModels:\
 const PICKER_DYNAMIC_CONFIG_MARKER = "__codexLinuxCustomEndpointDynamicConfigModels";
 const PICKER_DYNAMIC_CONFIG_NEEDLE = /(return\{availableModels:new Set\()([^)]*)(\),useHiddenModels:[^,]+,defaultModel:)([^}]+)(\}\})/;
 const PICKER_REASONING_FALLBACK_MARKER = "__codexLinuxCustomEndpointReasoningFallback";
+const PICKER_ULTRA_MARKER = "__codexLinuxCustomEndpointUltra";
+const PICKER_ULTRA_NEEDLE = /(function \w+\(\{authMethod:(\w+),availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:(\w+),models:\w+,useHiddenModels:\w+\}\)\{)(?=let \w+=\[\],\w+=null,\w+=[^,;]+,\w+=\w+\.some\(\w+=>\w+\.supportedReasoningEfforts\.some\(\(\{reasoningEffort:\w+\}\)=>\w+===`max`\)\))/;
 const PICKER_COMPOSER_MENU_MARKER = "__codexLinuxCustomEndpointComposerMenuModels";
 const PICKER_COMPOSER_MENU_NEEDLES = [
   /(,)(\w+)=(\w+)\?\.models(,\{modelSettings:\w+,setModelAndReasoningEffort:\w+\}=\w+\(\w+\),\w+=\w+\.model;)/,
@@ -63,8 +65,9 @@ const MAIN_LIST_MODELS_UPGRADE_NEEDLES = [
 //     metadata, or plain string slugs) previously crashed the picker's
 //     `models.some(m=>m.supportedReasoningEfforts.some(...))` selectors,
 //     which renders as an empty model menu;
-//   * catalog-only models are appended; the incoming result shape
-//     ({data}, {models}, or bare array) is preserved.
+//   * catalog entries are emitted first in catalog order, followed by raw
+//     provider-only entries; the incoming result shape ({data}, {models}, or
+//     bare array) is preserved.
 const MAIN_HELPER = String.raw`__codexLinuxMergeCustomEndpointCatalogModelsV3=function(e,t){try{let n=require("node:fs"),r=require("node:os"),i=require("node:path"),a=function(x){return typeof x=="string"&&x[0]==="~"?i.join(r.homedir(),x.slice(1)):x},o=t?.model_catalog_json,s=t?.model;if(typeof o!="string"||!o){let cp=i.join(process.env.CODEX_HOME||i.join(r.homedir(),".codex"),"config.toml"),cf=n.readFileSync(cp,"utf8");o=cf.match(/^\s*model_catalog_json\s*=\s*["']([^"']+)["']/m)?.[1],s??=cf.match(/^\s*model\s*=\s*["']([^"']+)["']/m)?.[1]}if(typeof o!="string"||!o)return e;let c=JSON.parse(n.readFileSync(a(o),"utf8")),l=Array.isArray(c)?c:Array.isArray(c?.models)?c.models:[],u=Array.isArray(e?.data)?e.data:Array.isArray(e?.models)?e.models:Array.isArray(e)?e:null;if(!u)return e;let d=function(list,dflt){let arr=Array.isArray(list)?list:[],out=arr.map(function(x){return{reasoningEffort:x?.effort??x?.reasoningEffort,description:x?.description??(x?.effort??x?.reasoningEffort)+" effort"}}).filter(function(x){return typeof x.reasoningEffort=="string"});return out.length?out:[{reasoningEffort:dflt??"medium",description:(dflt??"medium")+" effort"}]},f=new Map;for(let m of l){let g=m?.slug??m?.model;if(typeof g!="string"||!g)continue;let dr=m?.default_reasoning_level??m?.defaultReasoningEffort,ef=d(m?.supported_reasoning_levels??m?.supportedReasoningEfforts,dr);f.set(g,{model:g,name:m?.display_name??m?.name??g,displayName:m?.display_name??m?.name??g,description:m?.description??"",hidden:m?.visibility==="hidden",isDefault:g===s,defaultReasoningEffort:dr??ef[0].reasoningEffort,supportedReasoningEfforts:ef})}let p=new Set,q=[];for(let m of u){let g=typeof m=="string"?m:m?.model;if(typeof g=="string"&&f.has(g)){q.push(m&&typeof m=="object"?{...m,...f.get(g)}:f.get(g)),p.add(g);continue}if(typeof m=="string"){q.push({model:m,name:m,displayName:m,description:"",hidden:!1,isDefault:m===s,defaultReasoningEffort:"medium",supportedReasoningEfforts:d(null,"medium")}),p.add(m);continue}if(m&&typeof m=="object"){if(Array.isArray(m.supportedReasoningEfforts))q.push(m);else{let ef=d(null,m.defaultReasoningEffort);q.push({...m,name:m.name??m.displayName??g??"",displayName:m.displayName??m.name??g??"",defaultReasoningEffort:m.defaultReasoningEffort??ef[0].reasoningEffort,supportedReasoningEfforts:ef})}typeof g=="string"&&p.add(g);continue}q.push(m)}for(let[g,m]of f)p.has(g)||q.push(m);return Array.isArray(e?.data)?{...e,data:q}:Array.isArray(e?.models)?{...e,models:q}:q}catch{return e}}`;
 
 function buildListModelsReplacement(paramsVar, idVar, uuidVar) {
@@ -86,11 +89,15 @@ function injectMainHelper(source) {
   if (source.includes(MAIN_HELPER_MARKER)) {
     return source;
   }
+  const orderedMainHelper = MAIN_HELPER.replace(
+    "for(let[g,m]of f)p.has(g)||q.push(m);return",
+    "let z=[];for(let[g,m]of f)z.push(m);for(let m of q){let g=typeof m==\"string\"?m:m?.model;if(!f.has(g))z.push(m)}q=z;return",
+  );
   // Insert after an optional hashbang and/or leading "use strict" directive so
   // the directive stays effective. Top-of-module `var` is valid in both CJS
   // and ESM output and never depends on minified identifiers.
   const head = source.match(/^(?:#![^\n]*\n)?(?:\s*(?:"use strict"|'use strict');?\n?)?/)[0];
-  return `${source.slice(0, head.length)}var ${MAIN_HELPER};${source.slice(head.length)}`;
+  return `${source.slice(0, head.length)}var ${orderedMainHelper};${source.slice(head.length)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +155,13 @@ function readCatalogModelsForWebview() {
 // ---------------------------------------------------------------------------
 
 function applyModelPickerAllowlistPatch(source) {
+  if (!source.includes(PICKER_ULTRA_MARKER) && PICKER_ULTRA_NEEDLE.test(source)) {
+    source = source.replace(
+      PICKER_ULTRA_NEEDLE,
+      (_match, prefix, authMethodVar, includeUltraVar) =>
+        `${prefix}let ${PICKER_ULTRA_MARKER}=${authMethodVar}===\`apikey\`||${authMethodVar}===\`apiKey\`;${includeUltraVar}=${includeUltraVar}||${PICKER_ULTRA_MARKER};`,
+    );
+  }
   const webviewCatalogModels = readCatalogModelsForWebview();
   if (webviewCatalogModels.length > 0 && !source.includes(PICKER_COMPOSER_MENU_MARKER)) {
     const modelsJson = JSON.stringify(webviewCatalogModels);
@@ -265,13 +279,15 @@ function applyExtractedAppCatalogModelsPatch(extractedDir) {
 // ---------------------------------------------------------------------------
 
 // ponytail: old direct loader — kept for older upstream bundles that lack getCompatibleThreadSortKey.
-const SIDEBAR_APPLIED_MARKER = /\.recentConversationSortKey,modelProviders:\[\],archived:!1,sourceKinds:\w+/;
+const SIDEBAR_APPLIED_MARKER = /\.recentConversationSortKey,modelProviders:\[\],archived:!1,sourceKinds:\w+,useStateDbOnly:!0/;
 const SIDEBAR_NEEDLE = /listRecentThreads\(\{cursor:e,limit:t(,useStateDbOnly:\w+(?:=!\d)?)?\}\)\{return this\.params\.requestClient\.sendRequest\(`thread\/list`,\{limit:t,cursor:e,sortKey:this\.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:(\w+)(,useStateDbOnly:\w+)?\}\)\}/;
 
 // ponytail: server contract says modelProviders/sourceKinds [] means all providers + interactive sources.
-const ASYNC_FILTER_REPLACEMENT = `modelProviders:[],archived:!1,sourceKinds:[]`;
-const ASYNC_APPLIED_MARKER = /getCompatibleThreadSortKey\([^)]*\),modelProviders:\[\],archived:!1,sourceKinds:\[\]/;
-const ASYNC_FILTER_NEEDLE = /(getCompatibleThreadSortKey\([^)]*\),)modelProviders:null,archived:!1,sourceKinds:\w+(?=,useStateDbOnly:\w+)/;
+const ASYNC_FILTER_REPLACEMENT = `modelProviders:[],archived:!1,sourceKinds:[],useStateDbOnly:!0`;
+const ASYNC_APPLIED_MARKER = /getCompatibleThreadSortKey\([^)]*\),modelProviders:\[\],archived:!1,sourceKinds:\[\],useStateDbOnly:!0/;
+const ASYNC_FILTER_NEEDLE = /(getCompatibleThreadSortKey\([^)]*\),)modelProviders:(?:\w+|null),archived:!1,sourceKinds:\w+,useStateDbOnly:\w+/;
+const ALL_THREADS_FILTER_NEEDLE = /(listAllThreads\(\{modelProviders:)(?:\w+|null)(,archived:[^}]*\})/;
+const SEARCH_THREADS_FILTER_NEEDLE = /(`thread\/search`,\{[^}]*?modelProviders:)(?:\w+|null)(,sourceKinds:)(?:\w+|null)([^}]*\})/;
 const BLANK_THREAD_FILTER_NEEDLE = /let (\w+)=s\.data;if\((\w+)\)\{/;
 const BLANK_THREAD_FILTER_APPLIED_MARKER = /s\.data\.filter\(\w+=>\w+\.name\?\.trim\(\)\)/;
 
@@ -284,14 +300,19 @@ function applySidebarProviderFilterPatch(source) {
   if (SIDEBAR_NEEDLE.test(source)) {
     return source.replace(
       SIDEBAR_NEEDLE,
-      (_match, paramStateDbOnly = "", sourceKinds, payloadStateDbOnly = "") =>
-        `listRecentThreads({cursor:e,limit:t${paramStateDbOnly}}){return this.params.requestClient.sendRequest(\`thread/list\`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:${sourceKinds}${payloadStateDbOnly}})}`,
+      (_match, paramStateDbOnly = "", sourceKinds) =>
+        `listRecentThreads({cursor:e,limit:t${paramStateDbOnly}}){return this.params.requestClient.sendRequest(\`thread/list\`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:${sourceKinds},useStateDbOnly:!0})}`,
     );
   }
   // Async loader — include all providers, default to interactive sources, then drop blank-title rows.
   if (ASYNC_FILTER_NEEDLE.test(source)) {
     source = source.replace(ASYNC_FILTER_NEEDLE, `$1${ASYNC_FILTER_REPLACEMENT}`);
   }
+  // Keep archived/history/search paths provider-agnostic too. Recent-only
+  // patching leaves old default-endpoint threads invisible after switching
+  // to a custom endpoint.
+  source = source.replace(ALL_THREADS_FILTER_NEEDLE, "$1[]$2");
+  source = source.replace(SEARCH_THREADS_FILTER_NEEDLE, "$1[]$2[]$3");
   if (!BLANK_THREAD_FILTER_APPLIED_MARKER.test(source) && BLANK_THREAD_FILTER_NEEDLE.test(source)) {
     source = source.replace(BLANK_THREAD_FILTER_NEEDLE, (_match, dataVar, expandedVar) =>
       `let ${dataVar}=s.data.filter(e=>e.name?.trim());if(${expandedVar}){`,
@@ -313,7 +334,7 @@ function applySidebarProviderFilterPatch(source) {
 // ---------------------------------------------------------------------------
 
 const ALLOWLIST_ASSET_PATTERN = /^(?:models-and-reasoning-efforts|model-list-filter|app-initial~app-main~.*(?:home-ambient-suggestions-content|onboarding-page|new-thread-panel-page)).*\.js$/;
-const SIDEBAR_ASSET_PATTERN = /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*(?:plugin-detail-page|new-thread-panel-page)).*\.js$/;
+const SIDEBAR_ASSET_PATTERN = /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*(?:plugin-detail-page|new-thread-panel-page|thread-app-shell-chrome|remote-conver)).*\.js$/;
 
 module.exports = {
   descriptors: [
@@ -365,12 +386,16 @@ module.exports = {
     PICKER_DYNAMIC_CONFIG_MARKER,
     PICKER_DYNAMIC_CONFIG_NEEDLE,
     PICKER_REASONING_FALLBACK_MARKER,
+    PICKER_ULTRA_MARKER,
+    PICKER_ULTRA_NEEDLE,
     PICKER_COMPOSER_MENU_MARKER,
     PICKER_COMPOSER_MENU_NEEDLES,
     SIDEBAR_APPLIED_MARKER,
     SIDEBAR_NEEDLE,
     ASYNC_APPLIED_MARKER,
     ASYNC_FILTER_NEEDLE,
+    ALL_THREADS_FILTER_NEEDLE,
+    SEARCH_THREADS_FILTER_NEEDLE,
     BLANK_THREAD_FILTER_NEEDLE,
     BLANK_THREAD_FILTER_APPLIED_MARKER,
   },

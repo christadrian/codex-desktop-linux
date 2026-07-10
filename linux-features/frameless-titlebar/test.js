@@ -136,3 +136,25 @@ test("frameless-titlebar maps Linux window controls chrome to native webview lay
   assert.doesNotMatch(patched, /case`win32`:case`linux`:return`application-menu`/);
   assert.doesNotMatch(patched, /right:138/);
 });
+
+test("frameless-titlebar patches the July 2026 shared quick-chat branch", () => {
+  const source =
+    "case`quickChat`:case`primary`:return n===`darwin`?{titleBarStyle:`hiddenInset`,trafficLightPosition:A9(r),...e===`quickChat`?{hasShadow:!0,resizable:!0,transparent:!0}:{},...t?{}:{vibrancy:`menu`}}:n===`win32`||n===`linux`?{titleBarStyle:`hidden`,titleBarOverlay:j9(r),...e===`quickChat`?{resizable:!0}:{}}:{titleBarStyle:`default`,...e===`quickChat`?{resizable:!0}:{}};";
+  const patched = applyPatchTwice(applyFramelessTitlebarMainPatch, source);
+  assert.match(patched, /n===`win32`\?\{titleBarStyle:`hidden`,titleBarOverlay:j9\(r\)/);
+  assert.match(patched, /n===`linux`\?\{titleBarStyle:`hidden`,\.\.\.e===`quickChat`/);
+  assert.doesNotMatch(patched, /n===`win32`\|\|n===`linux`/);
+});
+
+test("frameless-titlebar disables the current quick-chat overlay sync on Linux", () => {
+  const source =
+    "installApplicationMenuTitleBarOverlaySync(e,t){if(process.platform!==`win32`&&process.platform!==`linux`||t!==`primary`&&t!==`quickChat`)return;let n=()=>{e.isDestroyed()||e.setTitleBarOverlay(j9(this.windowZooms.get(e.id)))};return c.nativeTheme.on(`updated`,n),n(),()=>{c.nativeTheme.off(`updated`,n)}}";
+
+  const patched = applyPatchTwice(applyFramelessTitlebarMainPatch, source);
+
+  assert.match(
+    patched,
+    /if\(process\.platform!==`win32`\|\|t!==`primary`&&t!==`quickChat`\)return/,
+  );
+  assert.doesNotMatch(patched, /process\.platform!==`linux`/);
+});

@@ -1,5 +1,8 @@
 # Frameless Titlebar
 
+The shared `quickChat`/`primary` BrowserWindow branch keeps Linux frameless
+without applying Windows titlebar overlays.
+
 This optional feature hides the Linux Electron titlebar overlay controls and
 removes the native menu chrome from the main Codex window. It is intended for
 compositors or window managers where compositor-managed decorations already

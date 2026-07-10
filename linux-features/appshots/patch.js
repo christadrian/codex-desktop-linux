@@ -15,8 +15,22 @@ function warn(message, patchName) {
 }
 
 function applyLinuxAppshotAvailabilityPatch(currentSource) {
+  const originalSource = currentSource;
   currentSource = currentSource.replace(
     /appshotsEnabled:([A-Za-z_$][\w$]*),/g,
+    (match, enabledAlias) => {
+      const patched = `appshotsEnabled:typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)?!0:${enabledAlias},`;
+      return currentSource.includes(patched) ? match : patched;
+    },
+  );
+  if (currentSource !== originalSource) {
+    return currentSource;
+  }
+
+  // Current bundles keep the feature payload in a memoized object and use a
+  // trailing comma only after the next property. Match that shape as well.
+  currentSource = currentSource.replace(
+    /appshotsEnabled:([A-Za-z_$][\w$]*),(?=[A-Za-z_$][\w$]*:)/g,
     (match, enabledAlias) => {
       const patched = `appshotsEnabled:typeof navigator!=\`undefined\`&&navigator.userAgent.includes(\`Linux\`)?!0:${enabledAlias},`;
       return currentSource.includes(patched) ? match : patched;
@@ -322,7 +336,7 @@ const descriptors = [
     id: "linux-appshots-availability",
     phase: "webview-asset",
     order: 1090,
-    pattern: /^(?:appshot-availability|app-initial~app-main~automations-page)-.*\.js$/,
+    pattern: /^(?:appshot-availability|app-initial~app-main~(?:automations-page|page))-.*\.js$/,
     missingDescription: "AppShots availability bundle",
     skipDescription: "Linux AppShots availability patch",
     apply: applyLinuxAppshotAvailabilityPatch,

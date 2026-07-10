@@ -657,6 +657,10 @@ function applyOpenInTargetsDirectoryModePatch(currentSource) {
       needle: "g=d||f!=null&&t.is(f),_=f!=null&&aj(f),v=f!=null&&sj(f),y=g?await kF(i):_?await OF({filePath:f}):[]",
       replacement: "w=f!=null&&codexLinuxOpenTargetIsDirectory(f),g=d||w||f!=null&&t.is(f),_=f!=null&&aj(f),v=f!=null&&sj(f),y=g?await kF(i):_?await OF({filePath:f}):[]",
     },
+    {
+      needle: "g=d||f!=null&&n.ys(f),_=f!=null&&KA(f),v=f!=null&&JA(f),y=g?await yF(i):_?await vF({filePath:f}):[]",
+      replacement: "w=f!=null&&codexLinuxOpenTargetIsDirectory(f),g=d||w||f!=null&&n.ys(f),_=f!=null&&KA(f),v=f!=null&&JA(f),y=g?await yF(i):_?await vF({filePath:f}):[]",
+    },
   ];
 
   if (currentSource.includes(helper)) {

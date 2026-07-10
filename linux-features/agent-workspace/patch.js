@@ -1947,7 +1947,8 @@ function isAgentWorkspaceSettingsSharedMetadataBundleSource(currentSource) {
 function isAgentWorkspaceSettingsRouteBundleSource(currentSource) {
   return (
     currentSource.includes(SETTINGS_ASSET) ||
-    /"general-settings":\(0,[A-Za-z_$][\w$]*\.lazy\)\(\(\)=>[A-Za-z_$][\w$]*\(/.test(currentSource)
+    /"general-settings":\(0,[A-Za-z_$][\w$]*\.lazy\)\(\(\)=>[A-Za-z_$][\w$]*\(/.test(currentSource) ||
+    /"general-settings":[A-Za-z_$][\w$]*\(async\(\)=>\(await [A-Za-z_$][\w$]*\(async\(\)=>\{/.test(currentSource)
   );
 }
 
@@ -2040,15 +2041,28 @@ function applyAgentWorkspaceSettingsIndexPatch(currentSource) {
   let patchedSource = currentSource;
 
   if (!patchedSource.includes(SETTINGS_ASSET)) {
-    const routePattern = /"general-settings":(?=\(0,([A-Za-z_$][\w$]*)\.lazy\)\(\(\)=>([A-Za-z_$][\w$]*)\()/;
-    if (!routePattern.test(patchedSource)) {
-      throw new Error("could not add agent workspace settings route");
+    const legacyRoutePattern = /"general-settings":(?=\(0,([A-Za-z_$][\w$]*)\.lazy\)\(\(\)=>([A-Za-z_$][\w$]*)\()/;
+    if (legacyRoutePattern.test(patchedSource)) {
+      patchedSource = patchedSource.replace(
+        legacyRoutePattern,
+        (_match, lazyAlias, preloadAlias) =>
+          `"${SETTINGS_SLUG}":(0,${lazyAlias}.lazy)(()=>${preloadAlias}(()=>import(\`./${SETTINGS_ASSET}\`),[],import.meta.url)),"general-settings":`,
+      );
+      return patchedSource;
     }
-    patchedSource = patchedSource.replace(
-      routePattern,
-      (_match, lazyAlias, preloadAlias) =>
-        `"${SETTINGS_SLUG}":(0,${lazyAlias}.lazy)(()=>${preloadAlias}(()=>import(\`./${SETTINGS_ASSET}\`),[],import.meta.url)),"general-settings":`,
-    );
+
+    const currentRoutePattern =
+      /"general-settings":(?=([A-Za-z_$][\w$]*)\(async\(\)=>\(await ([A-Za-z_$][\w$]*)\(async\(\)=>\{)/;
+    if (currentRoutePattern.test(patchedSource)) {
+      patchedSource = patchedSource.replace(
+        currentRoutePattern,
+        (_match, lazyAlias, preloadAlias) =>
+          `"${SETTINGS_SLUG}":${lazyAlias}(async()=>(await ${preloadAlias}(async()=>import(\`./${SETTINGS_ASSET}\`),[],import.meta.url)).AgentWorkspacesSettings),"general-settings":`,
+      );
+      return patchedSource;
+    }
+
+    throw new Error("could not add agent workspace settings route");
   }
 
   return patchedSource;

@@ -722,17 +722,17 @@ function applyLinuxAppServerFeatureEnablementPatch(currentSource) {
 }
 
 function applyAutomationUpdateEagerToolPatch(currentSource) {
-  const marker = "e.name===`automation_update`&&delete t.deferLoading";
+  const marker = "name===`automation_update`&&delete codexLinuxAutomationTool.deferLoading";
   if (currentSource.includes(marker)) {
     return currentSource;
   }
+  if (!currentSource.includes("automation_update")) {
+    return currentSource;
+  }
 
-  const dynamicToolsNeedle =
-    "tools:[...h?[_ee()]:[],...[],...i?.open_in_codex===!0?[TBt]:[],...h&&d?[SBt]:[],lu,...h&&y?[Ra]:[],...[],...g?AHt({availableHandoffHosts:e,availableModels:b,crossHostHandoffEnabled:n,forkThreadEnabled:!0}):[],...h&&_?[PBt,FBt]:[],...m===`conversational_onboarding`?[yoe]:[],...v&&m!==`conversational_onboarding`?[...vee,bu]:[]].map(e=>({type:`function`,...e,..._Ut.has(e.name)?{}:{deferLoading:!0}}))";
-  const dynamicToolsPatch =
-    "tools:[...h?[_ee()]:[],...[],...i?.open_in_codex===!0?[TBt]:[],...h&&d?[SBt]:[],lu,...h&&y?[Ra]:[],...[],...g?AHt({availableHandoffHosts:e,availableModels:b,crossHostHandoffEnabled:n,forkThreadEnabled:!0}):[],...h&&_?[PBt,FBt]:[],...m===`conversational_onboarding`?[yoe]:[],...v&&m!==`conversational_onboarding`?[...vee,bu]:[]].map(e=>{let t={type:`function`,...e,..._Ut.has(e.name)?{}:{deferLoading:!0}};return e.name===`automation_update`&&delete t.deferLoading,t})";
-
-  if (!currentSource.includes(dynamicToolsNeedle)) {
+  const dynamicToolsRegex =
+    /\.map\(([A-Za-z_$][\w$]*)=>\(\{type:`function`,\.\.\.\1,\.\.\.([A-Za-z_$][\w$]*)\.has\(\1\.name\)\?\{\}:\{deferLoading:!0\}\}\)\)/u;
+  if (!dynamicToolsRegex.test(currentSource)) {
     if (currentSource.includes("automation_update") && currentSource.includes("deferLoading:!0")) {
       console.warn(
         "WARN: Could not find dynamic tools construction point — skipping automation_update eager tool patch",
@@ -741,7 +741,11 @@ function applyAutomationUpdateEagerToolPatch(currentSource) {
     return currentSource;
   }
 
-  return currentSource.replace(dynamicToolsNeedle, dynamicToolsPatch);
+  return currentSource.replace(
+    dynamicToolsRegex,
+    (_match, toolVar, eagerToolsVar) =>
+      `.map(${toolVar}=>{let codexLinuxAutomationTool={type:\`function\`,...${toolVar},...${eagerToolsVar}.has(${toolVar}.name)?{}:{deferLoading:!0}};return ${toolVar}.name===\`automation_update\`&&delete codexLinuxAutomationTool.deferLoading,codexLinuxAutomationTool})`,
+  );
 }
 
 function applyLinuxAppServerBackfillWaitPatch(currentSource) {
@@ -936,7 +940,9 @@ function applyLinuxAppServerConversationHydrationPatch(currentSource) {
       patchedSource.includes("t===`needs_resume`?n?.type===`active`")
     ) {
       // Current upstream already preserves threadRuntimeStatus on summaries.
-    } else if (patchedSource.includes("threadRuntimeStatus") && patchedSource.includes("resumeState")) {
+    } else if (
+      /resumeState===`needs_resume`[^;]{0,120}threadRuntimeStatus=/u.test(patchedSource)
+    ) {
       console.warn(
         "WARN: Could not find app-server conversation runtime-status needle — skipping Linux app-server hydration runtime-status patch",
       );
@@ -995,6 +1001,15 @@ function applyLinuxAppServerConversationHydrationPatch(currentSource) {
 }
 
 function applyLinuxCompletedItemRecoveryPatch(currentSource) {
+  const malformedCompletedItemRecovery =
+    /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\}\);let codexLinuxCompletedItemExists/g;
+  if (malformedCompletedItemRecovery.test(currentSource)) {
+    return currentSource.replace(
+      malformedCompletedItemRecovery,
+      "firstTurnWorkItemStartedAtMs??Date.now());let codexLinuxCompletedItemExists",
+    );
+  }
+
   if (currentSource.includes("codexLinuxCompletedItemExists=")) {
     return currentSource;
   }
@@ -1017,7 +1032,7 @@ function applyLinuxCompletedItemRecoveryPatch(currentSource) {
     return currentSource.replace(
       modernCompletedItemDropPattern,
       (_match, workItemGuardFn, completedItemVar, turnVar, lookupFn, appendItemFn, viewItemVar) =>
-        `${workItemGuardFn}(${completedItemVar})&&(${turnVar}.firstTurnWorkItemStartedAtMs=${turnVar}.firstTurnWorkItemStartedAtMs??Date.now()});let codexLinuxCompletedItemExists=${turnVar}.items.some(e=>e.id===${viewItemVar}.id);if(${completedItemVar}.type!==\`subAgentActivity\`&&codexLinuxCompletedItemExists&&!${lookupFn}(${turnVar},${completedItemVar}.id,${completedItemVar}.type))return;${appendItemFn}(${turnVar},${viewItemVar})`,
+        `${workItemGuardFn}(${completedItemVar})&&(${turnVar}.firstTurnWorkItemStartedAtMs=${turnVar}.firstTurnWorkItemStartedAtMs??Date.now());let codexLinuxCompletedItemExists=${turnVar}.items.some(e=>e.id===${viewItemVar}.id);if(${completedItemVar}.type!==\`subAgentActivity\`&&codexLinuxCompletedItemExists&&!${lookupFn}(${turnVar},${completedItemVar}.id,${completedItemVar}.type))return;${appendItemFn}(${turnVar},${viewItemVar})`,
     );
   }
 
@@ -1364,16 +1379,14 @@ function applyLocalEnvironmentActionModalDraftPatch(currentSource) {
   const stateNeedle = `workspaceRoot:${workspaceVar}}=${paramVar},`;
   const statePatch =
     `workspaceRoot:${workspaceVar}}=${paramVar},[codexLinuxActionDraft,codexLinuxSetActionDraft]=(0,${reactVar}.useState)(()=>${actionVar}),codexLinuxUpdateActionDraft=codexLinuxPatch=>(codexLinuxSetActionDraft(codexLinuxDraft=>({...codexLinuxDraft,...codexLinuxPatch})),${updateVar}(codexLinuxPatch)),`;
+  const memoGuardPattern = new RegExp(
+    `${cacheVar}\\[(\\d+)\\]!==${actionVar}\\|\\|`,
+  );
   const requiredReplacements = [
     {
       needle: stateNeedle,
       replacement: statePatch,
       description: "draft state insertion point",
-    },
-    {
-      needle: `if(${cacheVar}[0]!==${actionVar}||`,
-      replacement: `if(${cacheVar}[0]!==codexLinuxActionDraft||${cacheVar}[0]!==${actionVar}||`,
-      description: "modal memo guard",
     },
     {
       needle: `${actionVar}.icon`,
@@ -1424,6 +1437,12 @@ function applyLocalEnvironmentActionModalDraftPatch(currentSource) {
   const missingReplacement = requiredReplacements.find(
     ({ needle }) => !patchedFunction.includes(needle),
   );
+  if (!memoGuardPattern.test(patchedFunction)) {
+    console.warn(
+      "WARN: Could not find local environment action modal modal memo guard — skipping action input patch",
+    );
+    return currentSource;
+  }
   if (missingReplacement != null) {
     console.warn(
       `WARN: Could not find local environment action modal ${missingReplacement.description} — skipping action input patch`,
@@ -1431,6 +1450,11 @@ function applyLocalEnvironmentActionModalDraftPatch(currentSource) {
     return currentSource;
   }
 
+  patchedFunction = patchedFunction.replace(
+    memoGuardPattern,
+    (_match, cacheIndex) =>
+      `${cacheVar}[${cacheIndex}]!==codexLinuxActionDraft||${cacheVar}[${cacheIndex}]!==${actionVar}||`,
+  );
   for (const { needle, replacement } of requiredReplacements) {
     patchedFunction = patchedFunction.replaceAll(needle, replacement);
   }

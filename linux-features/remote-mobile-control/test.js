@@ -950,6 +950,16 @@ test("Linux remote mobile app-server launch keeps a leading use strict directive
   assert.equal(applyLinuxRemoteMobileAppServerRemoteControlPatch(patched), patched);
 });
 
+test("Linux remote mobile app-server launch patches the July 2026 shared args constant", () => {
+  const source =
+    "var Wz=[`-c`,`features.code_mode_host=true`,`app-server`,`--analytics-default-enabled`],Gz=H({appServerVersion:R()});";
+  const patched = applyLinuxRemoteMobileAppServerRemoteControlPatch(source);
+  assert.match(patched, /codexLinuxRemoteMobileAppServerArgs/);
+  assert.match(patched, /\[`-c`,`features\.code_mode_host=true`,`app-server`,`--remote-control`,`--analytics-default-enabled`\]/);
+  assert.match(patched, /var Wz=codexLinuxRemoteMobileAppServerArgs\(\)/);
+  assert.equal(applyLinuxRemoteMobileAppServerRemoteControlPatch(patched), patched);
+});
+
 test("Linux remote-control client revoke clears setup completion after last client is removed", () => {
   const source = syntheticRevokeSetupResetBundle();
   const patched = applyLinuxRemoteControlClientRevokeSetupResetPatch(source);

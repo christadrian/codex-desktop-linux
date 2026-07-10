@@ -40,6 +40,20 @@ function applyLinuxQuitGuardPatch(currentSource) {
     return patchedSource.replace(matchedPrefix, `${matchedPrefix}${quitGuardSuffix}`);
   }
 
+  // Electron 42 bundles namespace-wrap the CommonJS imports (`c=e.o(c)`) and
+  // keep the node:path/node:fs bindings in a shared import block. The guard
+  // only needs a stable post-import insertion point, not the old three-binding
+  // declaration shape.
+  const wrappedFsImportNeedle =
+    /[A-Za-z_$][\w$]*=require\(`node:fs`\)[^;]*;([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\.o\(\1\);/;
+  const wrappedFsImportMatch = patchedSource.match(wrappedFsImportNeedle);
+  if (wrappedFsImportMatch != null) {
+    return patchedSource.replace(
+      wrappedFsImportMatch[0],
+      `${wrappedFsImportMatch[0]}${quitGuardSuffix}`,
+    );
+  }
+
   if (patchedSource.includes("require(`electron`)") && patchedSource.includes("require(`node:path`)")) {
     console.warn("WARN: Could not find Linux quit guard insertion point — skipping explicit quit-state patch");
   }

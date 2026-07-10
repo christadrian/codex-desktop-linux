@@ -134,3 +134,12 @@ CODEX_LINUX_READ_ALOUD_NATIVE_FALLBACK=0 codex-desktop
 ```
 
 The handler never invokes a shell for response text.
+Shared bundles that only define the assistant component are ignored; only JSX
+render-call candidates participate in drift warnings.
+
+## Testing
+
+```bash
+node --test linux-features/read-aloud/test.js
+node linux-features/read-aloud/eval.js
+```

@@ -173,8 +173,12 @@ The removed in-conversation monitor must stay absent: the bridge should not
 expose the old screenshot-backed `workspaceObserve` action, and active
 workspaces should be controlled from Settings plus the native viewer.
 
+The Settings route patch supports the current async preload registry emitted by
+the upstream webview build.
+
 Run the feature tests with:
 
 ```bash
 node --test linux-features/agent-workspace/test.js
+node linux-features/agent-workspace/eval.js
 ```
