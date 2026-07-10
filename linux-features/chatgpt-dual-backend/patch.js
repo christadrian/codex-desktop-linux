@@ -10,9 +10,12 @@ const {
 
 const PATCH_MARKER = "__codexLinuxChatGptBackendSession";
 const CHAT_NAV_MARKER = "__codexLinuxChatGptNavVisible";
+const SITES_AVAILABILITY_MARKER = "__codexLinuxChatGptSitesAvailable";
 const AUTH_BRIDGE_MARKER = "__codexLinuxChatGptSavedAuthToken";
 const SITES_GUARD =
   /(function [A-Za-z_$][\w$]*\(\{accountId:([A-Za-z_$][\w$]*),accountLoading:([A-Za-z_$][\w$]*),additionalRolloutEnabled:([A-Za-z_$][\w$]*),authLoading:([A-Za-z_$][\w$]*),authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,rolloutEnabled:([A-Za-z_$][\w$]*),supportedSurface:([A-Za-z_$][\w$]*)\}\)\{return )/;
+const SITES_AVAILABILITY_GUARD =
+  /([A-Za-z_$][\w$]*=[A-Za-z_$][\w$]*\([A-Za-z_$][\w$]*,\(\{get:([A-Za-z_$][\w$]*)\}\)=>\{)(if\(!\2\([A-Za-z_$][\w$]*,`637432221`\)\)return`unavailable`;)/;
 
 function chatGptSession() {
   try {
@@ -29,7 +32,6 @@ function chatGptSession() {
 }
 
 function applyChatGptDualBackendPatch(source) {
-  if (source.includes(PATCH_MARKER)) return source;
   const session = chatGptSession();
   if (session == null) {
     if (source.includes("not-chatgpt-auth") && source.includes("/wham/sites/access")) {
@@ -38,14 +40,31 @@ function applyChatGptDualBackendPatch(source) {
     return source;
   }
 
-  const patched = source.replace(
-    SITES_GUARD,
-    (_match, prefix, _accountId, _accountLoading, additionalRolloutEnabled, _authLoading, authMethod, rolloutEnabled, supportedSurface) =>
-      `const ${PATCH_MARKER}=${JSON.stringify(session.accountId)};${prefix}${supportedSurface}&&${authMethod}!==\`chatgpt\`?(!${rolloutEnabled}&&!${additionalRolloutEnabled}?{status:\`denied\`,reason:\`rollout-disabled\`}:{status:\`allowed\`,accountId:${PATCH_MARKER},plan:null}):`,
-  );
+  let patched = source;
+  const hadEntitlementPatch = patched.includes(`const ${PATCH_MARKER}=`);
+  if (!hadEntitlementPatch) {
+    patched = patched.replace(
+      SITES_GUARD,
+      (_match, prefix, _accountId, _accountLoading, additionalRolloutEnabled, _authLoading, authMethod, rolloutEnabled, supportedSurface) =>
+        `const ${PATCH_MARKER}=${JSON.stringify(session.accountId)};${prefix}${supportedSurface}&&${authMethod}!==\`chatgpt\`?(!${rolloutEnabled}&&!${additionalRolloutEnabled}?{status:\`denied\`,reason:\`rollout-disabled\`}:{status:\`allowed\`,accountId:${PATCH_MARKER},plan:null}):`,
+    );
+  }
+  const entitlementPatched = patched.includes(`const ${PATCH_MARKER}=`);
+  const hadAvailabilityPatch = patched.includes(SITES_AVAILABILITY_MARKER);
+  if (!hadAvailabilityPatch) {
+    patched = patched.replace(
+      SITES_AVAILABILITY_GUARD,
+      `$1if(typeof ${PATCH_MARKER}===\`string\`)return\`available\`;/*${SITES_AVAILABILITY_MARKER}*/$3`,
+    );
+  }
 
-  if (patched === source && source.includes("not-chatgpt-auth") && source.includes("/wham/sites/access")) {
-    console.warn("WARN: Could not find ChatGPT Chat/Sites entitlement guard — skipping ChatGPT dual-backend patch");
+  if (source.includes("/wham/sites/access")) {
+    if (!entitlementPatched && source.includes("not-chatgpt-auth")) {
+      console.warn("WARN: Could not find ChatGPT Chat/Sites entitlement guard — skipping ChatGPT dual-backend entitlement patch");
+    }
+    if (!patched.includes(SITES_AVAILABILITY_MARKER)) {
+      console.warn("WARN: Could not find ChatGPT Sites availability guard — skipping ChatGPT Sites visibility patch");
+    }
   }
   return patched;
 }

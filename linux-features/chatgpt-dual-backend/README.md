@@ -11,12 +11,14 @@ when `auth.json` has no usable session.
 The entitlement patch scans all `app-initial~app-main~*.js` chunks because
 upstream truncates long chunk names before the `chatgpt` segment.
 
-When a custom endpoint is active, the app-server may not expose the ChatGPT
-access token to the desktop fetch bridge. For OpenAI-owned requests that already
-ask the bridge to attach authentication, this feature falls back to the saved
-`auth.json` access token in the main process. Empty cached/app-server tokens do
-not suppress that fallback. The token is never embedded in the webview, and the
-upstream allowlist still prevents attaching it to non-OpenAI URLs.
+When a custom endpoint is active, the app-server may not expose ChatGPT Sites
+rollout flags or the ChatGPT access token. The feature treats Sites as available
+when the saved ChatGPT session is valid. For OpenAI-owned requests that already
+ask the desktop fetch bridge to attach authentication, it falls back to the
+saved `auth.json` access token in the main process. Empty cached/app-server
+tokens do not suppress that fallback. The token is never embedded in the
+webview, and the upstream allowlist still prevents attaching it to non-OpenAI
+URLs.
 
 The feature requires a valid `~/.codex/auth.json` with both
 `tokens.access_token` and `tokens.account_id`. It does not copy or embed the
