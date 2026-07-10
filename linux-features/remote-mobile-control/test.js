@@ -25,6 +25,7 @@ const {
   applyLinuxRemoteControlClientRevokeSetupResetPatch,
   applyLinuxRemoteControlClientRevocationRecoveryPatch,
   applyLinuxRemoteControlCopyPatch,
+  applyLinuxRemoteControlChatGptAuthPatch,
   applyLinuxRemoteControlPreserveConfigPatch,
   applyLinuxRemoteControlFeatureSyncPatch,
   applyLinuxRemoteControlEnableForHostParamsPatch,
@@ -77,6 +78,17 @@ function syntheticCurrentMainBundle() {
     "var lz=(0,b.createRequire)(__filename),uz=`remote-control-device-key.node`,dz=`codex-device-key-sign-payload/v1`;",
     "function pz({resourcesPath:e}){let t=null,n=()=>{if(process.platform!==`darwin`)throw Error(`Remote control device keys are only available on macOS`);if(e==null)throw Error(`Remote control device keys require resourcesPath`);return t??=lz((0,i.join)(e,`native`,uz)),t};return{createDeviceKey:e=>n().createDeviceKey(e??`hardware_only`),deleteDeviceKey:e=>n().deleteDeviceKey(e),getDeviceKeyPublic:e=>n().getDeviceKeyPublic(e),signDeviceKey:async(e,t)=>{let r=mz(t);return{...await n().signDeviceKey(e,r),signedPayloadBase64:r.toString(`base64`)}}}}",
     "async function vV({codexHome:e,hostConfig:n,logger:r=t.Jr()}){if(n.kind===`local`)try{await yV(i.default.join(e??t.Rr({hostConfig:n,preferWsl:t.Kr(n)}),_V))&&r.info(`Removed remote_control from config before app-server start`)}catch(e){r.warning(`Failed to remove remote_control before app-server start`,{safe:{},sensitive:{error:e}})}}",
+  ].join("");
+}
+
+function syntheticRemoteControlCustomEndpointBundle() {
+  return [
+    "let f=require(`node:crypto`),l=require(`node:os`),u=require(`node:path`),m=require(`node:fs`);",
+    "function L_(e){let t=process.env.CODEX_API_BASE_URL;return t&&t.trim().length>0?t.replace(/\\/+$/,``):e.prodApiBaseUrl}",
+    "function R_(e,t){return`${L_(e)}/${t.replace(/^\\/+/,``)}`}",
+    "async function z_({action:e=`connect remote control environments`,appServerClient:t,desktopOriginator:n,headers:r={},refreshToken:i=!1}){let o=await t.getAuthToken({refreshToken:i});if(!o)throw Error(`Sign in to ChatGPT to ${e}.`);return{...r,Authorization:`Bearer ${o}`}}",
+    "async function bv(e){return z_({action:`check remote control authorization`,...e})}",
+    "let remotePath=R_({prodApiBaseUrl:`https://chatgpt.com/backend-api`},`/codex/remote/control/client`);",
   ].join("");
 }
 
@@ -706,6 +718,7 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
     assert.deepEqual(descriptors.map((descriptor) => descriptor.id), [
       "feature:remote-mobile-control:linux-remote-control-device-key",
       "feature:remote-mobile-control:linux-remote-control-preserve-config",
+      "feature:remote-mobile-control:linux-remote-control-chatgpt-auth",
       "feature:remote-mobile-control:linux-remote-control-client-account-compatibility",
       "feature:remote-mobile-control:linux-remote-control-client-revocation-recovery",
       "feature:remote-mobile-control:linux-remote-mobile-app-server-remote-control",
@@ -725,6 +738,7 @@ test("remote mobile control feature exposes opt-in main-bundle and webview patch
       "feature:remote-mobile-control:linux-remote-mobile-active-status",
     ]);
     assert.deepEqual(descriptors.map((descriptor) => descriptor.phase), [
+      "main-bundle",
       "main-bundle",
       "main-bundle",
       "main-bundle",
@@ -812,6 +826,50 @@ test("Linux remote-control patches update the device-key provider and preserve c
     applyLinuxRemoteControlPreserveConfigPatch(applyLinuxRemoteControlDeviceKeyPatch(patched)),
     patched,
   );
+});
+
+test("remote control uses saved ChatGPT auth and OpenAI API with custom endpoints", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "codex-remote-control-auth-"));
+  const previousCodexHome = process.env.CODEX_HOME;
+  const previousApiBase = process.env.CODEX_API_BASE_URL;
+  try {
+    process.env.CODEX_HOME = home;
+    process.env.CODEX_API_BASE_URL = "https://custom.example/v1";
+    fs.writeFileSync(
+      path.join(home, "auth.json"),
+      JSON.stringify({ tokens: { access_token: "saved-chatgpt-token" } }),
+    );
+
+    const patched = applyLinuxRemoteControlChatGptAuthPatch(
+      syntheticRemoteControlCustomEndpointBundle(),
+    );
+    assert.match(patched, /codexLinuxRemoteControlSavedChatGptToken/);
+    assert.match(patched, /startsWith\(`codex\/remote\/control`\)\?e\.prodApiBaseUrl/);
+    assert.equal(applyLinuxRemoteControlChatGptAuthPatch(patched), patched);
+
+    const context = { require, process };
+    vm.runInNewContext(`${patched};globalThis.__auth=z_;globalThis.__remotePath=remotePath`, context);
+    const headers = await context.__auth({
+      action: "check remote control authorization",
+      appServerClient: {
+        getAuthToken: async () => {
+          throw new Error("custom endpoint token must not be used");
+        },
+      },
+      desktopOriginator: "codex-desktop",
+    });
+    assert.equal(headers.Authorization, "Bearer saved-chatgpt-token");
+    assert.equal(
+      context.__remotePath,
+      "https://chatgpt.com/backend-api/codex/remote/control/client",
+    );
+  } finally {
+    if (previousCodexHome == null) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    if (previousApiBase == null) delete process.env.CODEX_API_BASE_URL;
+    else process.env.CODEX_API_BASE_URL = previousApiBase;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("Linux remote-control device-key patch handles current minified aliases", () => {

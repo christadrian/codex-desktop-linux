@@ -48,6 +48,9 @@ What it changes:
 - Preserves `remote_control = true` / `features.remote_control = true` in the
   local Codex config instead of letting upstream strip it before app-server
   startup.
+- Uses the saved ChatGPT session and OpenAI remote-control API for enrollment,
+  authorization, QR setup, and connection refresh even when Codex task traffic
+  uses a custom endpoint.
 - Updates remote-control settings and Codex mobile setup copy so the Linux flow
   is not described as Mac-only.
 - Stages `.codex-linux/cold-start.d/remote-mobile-control`, a feature-owned

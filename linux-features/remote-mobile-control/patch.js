@@ -87,6 +87,11 @@ const REMOTE_CONTROL_LINUX_COPY_REPLACEMENTS = [
   ["local Mac", "local Linux desktop"],
 ];
 const CLIENT_ACCOUNT_COMPAT_MARKER = "codexLinuxRemoteControlAccountMatches";
+const REMOTE_CONTROL_CHATGPT_AUTH_MARKER = "codexLinuxRemoteControlSavedChatGptToken";
+const REMOTE_CONTROL_CHATGPT_AUTH_NEEDLE =
+  /async function ([A-Za-z_$][\w$]*)\(\{action:([A-Za-z_$][\w$]*)(=`connect remote control environments`)?,appServerClient:([A-Za-z_$][\w$]*),desktopOriginator:([A-Za-z_$][\w$]*),headers:([A-Za-z_$][\w$]*)=\{\},refreshToken:([A-Za-z_$][\w$]*)=!\d\}\)\{let ([A-Za-z_$][\w$]*)=await \4\.getAuthToken\(\{refreshToken:\7\}\);/u;
+const REMOTE_CONTROL_API_URL_NEEDLE =
+  /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{return`\$\{([A-Za-z_$][\w$]*)\(\2\)\}\/\$\{\3\.replace\([^}]+\)\}`\}/u;
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -97,6 +102,39 @@ function replaceOnce(source, needle, replacement) {
     return null;
   }
   return source.replace(needle, replacement);
+}
+
+function applyLinuxRemoteControlChatGptAuthPatch(source) {
+  if (source.includes(REMOTE_CONTROL_CHATGPT_AUTH_MARKER)) {
+    return source;
+  }
+  if (
+    !source.includes("check remote control authorization") ||
+    !source.includes("/codex/remote/control/")
+  ) {
+    return source;
+  }
+
+  const authMatch = source.match(REMOTE_CONTROL_CHATGPT_AUTH_NEEDLE);
+  const urlMatch = source.match(REMOTE_CONTROL_API_URL_NEEDLE);
+  if (authMatch == null || urlMatch == null) {
+    console.warn("WARN: Could not find remote-control ChatGPT auth needles - skipping custom-endpoint remote-control patch");
+    return source;
+  }
+
+  const [, authFunction, actionVar, actionDefault = "", appServerClientVar, desktopOriginatorVar, headersVar, refreshTokenVar, tokenVar] = authMatch;
+  const authHelper =
+    `function ${REMOTE_CONTROL_CHATGPT_AUTH_MARKER}(){try{let e=require(\`node:fs\`),t=require(\`node:os\`),n=require(\`node:path\`),r=JSON.parse(e.readFileSync(n.join(process.env.CODEX_HOME||n.join(process.env.HOME||t.homedir(),\`.codex\`),\`auth.json\`),\`utf8\`))?.tokens?.access_token;return typeof r===\`string\`&&r.length>0?r:void 0}catch{return void 0}}`;
+  const authReplacement =
+    `${authHelper}async function ${authFunction}({action:${actionVar}${actionDefault},appServerClient:${appServerClientVar},desktopOriginator:${desktopOriginatorVar},headers:${headersVar}={},refreshToken:${refreshTokenVar}=!1}){let ${tokenVar}=${REMOTE_CONTROL_CHATGPT_AUTH_MARKER}();if(!${tokenVar})${tokenVar}=await ${appServerClientVar}.getAuthToken({refreshToken:${refreshTokenVar}});`;
+
+  const [, urlFunction, optionsVar, pathInputVar, baseUrlFunction] = urlMatch;
+  const urlReplacement =
+    `function ${urlFunction}(${optionsVar},${pathInputVar}){let codexLinuxRemoteControlPath=${pathInputVar}.replace(/^\\/+/,\`\`),codexLinuxRemoteControlBase=codexLinuxRemoteControlPath.startsWith(\`codex/remote/control\`)?${optionsVar}.prodApiBaseUrl:${baseUrlFunction}(${optionsVar});return\`\${codexLinuxRemoteControlBase}/\${codexLinuxRemoteControlPath}\`}`;
+
+  return source
+    .replace(authMatch[0], authReplacement)
+    .replace(urlMatch[0], urlReplacement);
 }
 
 function linuxRemoteControlClientAccountCompatibilityHelpers(loadEnrollmentFn, enrollmentKeyFn) {
@@ -1553,6 +1591,13 @@ module.exports = [
     apply: applyLinuxRemoteControlPreserveConfigPatch,
   },
   {
+    id: "linux-remote-control-chatgpt-auth",
+    phase: "main-bundle",
+    order: 20_112,
+    ciPolicy: "optional",
+    apply: applyLinuxRemoteControlChatGptAuthPatch,
+  },
+  {
     id: "linux-remote-control-client-account-compatibility",
     phase: "main-bundle",
     order: 20_115,
@@ -1727,6 +1772,7 @@ module.exports.applyLinuxRemoteControlEnableForHostParamsPatch =
   applyLinuxRemoteControlEnableForHostParamsPatch;
 module.exports.applyLinuxRemoteMobileActiveStatusPatch = applyLinuxRemoteMobileActiveStatusPatch;
 module.exports.applyLinuxRemoteControlPreserveConfigPatch = applyLinuxRemoteControlPreserveConfigPatch;
+module.exports.applyLinuxRemoteControlChatGptAuthPatch = applyLinuxRemoteControlChatGptAuthPatch;
 module.exports.applyLinuxRemoteControlClientAccountCompatibilityPatch =
   applyLinuxRemoteControlClientAccountCompatibilityPatch;
 module.exports.applyLinuxRemoteControlClientRevocationRecoveryPatch =
