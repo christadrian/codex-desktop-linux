@@ -10,61 +10,33 @@ const {
 function applyBrowserUseNodeReplApprovalPatch(currentSource) {
   let patchedSource = currentSource;
   let patchedTrustedHashes = false;
-  const hasBrowserUseRuntimeContext =
-    currentSource.includes("NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S") ||
-    (
-      currentSource.includes("nodeReplPath:") &&
-      currentSource.includes("shouldUseWslPaths:")
-    );
+  const hasTrustedHashesRuntimeBuilder =
+    /(?<!async )function [A-Za-z_$][\w$]*\(\{(?=[^{}]*nodePath:)(?=[^{}]*nodeReplPath:)(?=[^{}]*shouldUseWslPaths:)[^{}]*trustedBrowserClientSha256s:[A-Za-z_$][\w$]*(?:=\[\])?[^{}]*\}\)\{/.test(currentSource);
 
-  const destructuredTrustedHashesRegex =
-    /(function [A-Za-z_$][\w$]*\(\{(?:(?!\}\)\{)[\s\S]){0,4000}?trustedBrowserClientSha256s:([A-Za-z_$][\w$]*)(?:=[^,}]+)?(?:(?!\}\)\{)[\s\S]){0,4000}\}\)\{)/g;
-  const runtimeFactoryTrustedHashesRegex =
-    /(trustedBrowserClientSha256s:)(?!codexLinuxTrustedBrowserClientSha256s\()([A-Za-z_$][\w$]*)(?!\s*=)/g;
+  const runtimeBuilderTrustedHashesRegex =
+    /(?<!async )function ([A-Za-z_$][\w$]*)\(\{(?=[^{}]*nodePath:)(?=[^{}]*nodeReplPath:)(?=[^{}]*shouldUseWslPaths:)([^{}]*?trustedBrowserClientSha256s:)([A-Za-z_$][\w$]*)([^{}]*?\})\)\{(?![A-Za-z_$][\w$]*=codexLinuxTrustedBrowserClientSha256s\()/g;
   if (
-    hasBrowserUseRuntimeContext &&
     requireName(patchedSource, "node:fs") != null &&
     requireName(patchedSource, "node:path") != null &&
     requireName(patchedSource, "node:crypto") != null
   ) {
     patchedSource = patchedSource.replace(
-      destructuredTrustedHashesRegex,
-      (_match, functionPrefix, trustedHashesVar, offset) => {
-        if (
-          patchedSource.startsWith(
-            `${trustedHashesVar}=codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar});`,
-            offset + _match.length,
-          )
-        ) {
-          return _match;
-        }
+      runtimeBuilderTrustedHashesRegex,
+      (
+        _match,
+        functionName,
+        configPrefix,
+        trustedHashesVar,
+        configSuffix,
+      ) => {
         patchedTrustedHashes = true;
-        return `${functionPrefix}${trustedHashesVar}=codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar});`;
-      },
-    );
-    patchedSource = patchedSource.replace(
-      runtimeFactoryTrustedHashesRegex,
-      (_match, configPrefix, trustedHashesVar, offset) => {
-        const factoryContext = patchedSource.slice(Math.max(0, offset - 4000), offset);
-        const factoryTail = patchedSource.slice(offset, offset + 4000);
-        const factoryEnd = factoryTail.indexOf("})");
-        if (
-          !/[A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\(\{[\s\S]*$/.test(factoryContext) ||
-          factoryEnd < 0 ||
-          !factoryTail.slice(0, factoryEnd).includes("shouldUseWslPaths:")
-        ) {
-          return _match;
-        }
-        patchedTrustedHashes = true;
-        return `${configPrefix}codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar})`;
+        return `function ${functionName}({${configPrefix}${trustedHashesVar}${configSuffix}){${trustedHashesVar}=codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar});`;
       },
     );
   }
 
-  // 26.623+: the browser-use node_repl mcp server config is emitted as a
-  // standalone object literal `{args:[],command:VAR,env:VAR,startup_timeout_sec:120}`
-  // (env is now a hoisted variable, not the old inline `env:{...}` literal) inside
-  // a separate `src-*.js` chunk. Insert the js auto-approval there.
+  // The node_repl MCP server config is a standalone object literal in a
+  // separate build chunk. Insert the js auto-approval there.
   const mcpServerConfigRegex =
     /(\[`mcp_servers\.\$\{[A-Za-z_$][\w$]*\}`\]:\{args:\[\],command:[A-Za-z_$][\w$]*,env:[A-Za-z_$][\w$]*,)(startup_timeout_sec:120\})/g;
   const mcpServerConfigAlreadyApprovedRegex =
@@ -89,11 +61,7 @@ function applyBrowserUseNodeReplApprovalPatch(currentSource) {
       console.warn(
         "WARN: Could not find fs/path/crypto aliases — skipping Linux Browser Use trusted hash patch",
       );
-      patchedSource = patchedSource.replace(
-        /trustedBrowserClientSha256s:codexLinuxTrustedBrowserClientSha256s\(([A-Za-z_$][\w$]*)\)/g,
-        "trustedBrowserClientSha256s:$1",
-      );
-      patchedTrustedHashes = false;
+      return currentSource;
     } else {
       const helper =
         `function codexLinuxTrustedBrowserClientSha256s(__codexHashes,__codexResourcesPath=process.resourcesPath){if(process.platform!==\`linux\`)return __codexHashes;let __codexTrustedHashes=Array.isArray(__codexHashes)?[...__codexHashes]:[],__codexBasePath=__codexResourcesPath??"";if(__codexBasePath.length===0)return Array.from(new Set(__codexTrustedHashes));for(let __codexPluginName of[\`browser\`,\`chrome\`])try{let __codexBrowserClientPath=(0,${pathVar}.join)(__codexBasePath,\`plugins\`,\`openai-bundled\`,\`plugins\`,__codexPluginName,\`scripts\`,\`browser-client.mjs\`);(0,${fsVar}.existsSync)(__codexBrowserClientPath)&&__codexTrustedHashes.push((0,${cryptoVar}.createHash)(\`sha256\`).update((0,${fsVar}.readFileSync)(__codexBrowserClientPath)).digest(\`hex\`))}catch{}return Array.from(new Set(__codexTrustedHashes))}`;
@@ -111,8 +79,7 @@ function applyBrowserUseNodeReplApprovalPatch(currentSource) {
   if (
     !patchedTrustedHashes &&
     !patchedSource.includes("codexLinuxTrustedBrowserClientSha256s(") &&
-    patchedSource.includes("NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S") &&
-    patchedSource.includes("trustedBrowserClientSha256s:")
+    hasTrustedHashesRuntimeBuilder
   ) {
     console.warn(
       "WARN: Could not find Browser Use trusted hash insertion point — skipping Linux Browser Use trusted hash patch",
@@ -135,10 +102,8 @@ function applyBrowserUseNodeReplApprovalPatch(currentSource) {
   return patchedSource;
 }
 
-// 26.623+: the node_repl mcp config (and the NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S
-// trusted-hash code) was re-chunked out of the main bundle into a sibling
-// `.vite/build/src-*.js` chunk. Scan every build chunk that carries either marker so
-// the approval patch reaches whichever chunk now hosts the config.
+// The trusted-hash setup and node_repl config can live in different build chunks.
+// Scan every chunk carrying either marker so each patch reaches its current host.
 function applyBrowserUseNodeReplApprovalAssets(extractedDir) {
   const buildDir = path.join(extractedDir, ".vite", "build");
   if (!fs.existsSync(buildDir)) {
@@ -155,7 +120,6 @@ function applyBrowserUseNodeReplApprovalAssets(extractedDir) {
         const source = fs.readFileSync(candidate, "utf8");
         return (
           source.includes("startup_timeout_sec:120") ||
-          source.includes("NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S") ||
           source.includes("trustedBrowserClientSha256s")
         );
       } catch {

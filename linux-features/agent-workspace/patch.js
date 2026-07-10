@@ -8,7 +8,6 @@ const {
   findRequiredWebviewAsset,
 } = require("../../scripts/patches/lib/assets.js");
 const {
-  findExportedAlias,
   requireName,
 } = require("../../scripts/patches/lib/minified-js.js");
 
@@ -183,19 +182,15 @@ function buildAgentWorkspaceSettingsSource({
   reactExportName = "t",
   codexRequestAsset,
   codexRequestExportName = "n",
-  settingsPageAsset,
-  settingsPageExportName = "t",
   vscodeApiAsset,
 }) {
   const requestAsset = codexRequestAsset ?? vscodeApiAsset;
   return `import{s as __toESM}from"./${chunkAsset}";
 import{${reactExportName} as __reactFactory}from"./${reactAsset}";
 import{${codexRequestExportName} as __post}from"./${requestAsset}";
-${settingsPageAsset ? `import{${settingsPageExportName} as SettingsPage}from"./${settingsPageAsset}";` : ""}
 
 var React=__toESM(__reactFactory(),1);
-var h=React.createElement?React.createElement:function(type,props){var children=Array.prototype.slice.call(arguments,2),nextProps=props==null?{}:{...props};children.length===1?nextProps.children=children[0]:children.length>1&&(nextProps.children=children);return (children.length>1?React.jsxs:React.jsx)(type,nextProps);};
-${settingsPageAsset ? "" : `
+var h=React.createElement;
 function SettingsPage({title,subtitle,children}){
   return h("div",{className:"h-full min-h-0 w-full overflow-y-auto"},
     h("div",{className:"mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6"},
@@ -207,7 +202,6 @@ function SettingsPage({title,subtitle,children}){
     )
   );
 }
-`}
 var COMMAND_KEY=${JSON.stringify(SETTINGS_COMMAND_KEY)};
 var PERMISSIONS_KEY=${JSON.stringify(SETTINGS_PERMISSIONS_KEY)};
 var DEFAULT_COMMAND_LABEL="Auto-discovered agent-workspace-linux";
@@ -1787,36 +1781,6 @@ function webviewAssetsDir(extractedDir) {
   return path.join(extractedDir, "webview", "assets");
 }
 
-function findReactJsxFactoryWebviewAsset(assetsDir) {
-  const candidates = fs
-    .readdirSync(assetsDir)
-    .filter((name) => /\.js$/.test(name))
-    .sort();
-  for (const assetName of candidates) {
-    const source = fs.readFileSync(path.join(assetsDir, assetName), "utf8");
-    if (!source.includes("react.transitional.element") || !source.includes("jsx")) {
-      continue;
-    }
-    const factoryMatch = source.match(/(?:^|[,;])([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\(\([^)]*\)=>\{[A-Za-z_$][\w$]*\.exports=([A-Za-z_$][\w$]*)\(\)\}\)\)/u);
-    if (factoryMatch == null) {
-      continue;
-    }
-    const exportName = findExportedAlias(source, factoryMatch[1]);
-    if (exportName != null) {
-      return { assetName, exportName };
-    }
-  }
-  const legacyAsset = findRequiredWebviewAsset(assetsDir, /^react-.*\.js$/, "react.transitional.element", "React asset");
-  return { assetName: legacyAsset, exportName: "t" };
-}
-
-function findAgentWorkspaceSettingsPageAsset(assetsDir) {
-  if (fs.existsSync(path.join(assetsDir, "linux-settings-page-linux.js"))) {
-    return { assetName: "linux-settings-page-linux.js", exportName: "t" };
-  }
-  return null;
-}
-
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -1894,18 +1858,11 @@ function resolveAgentWorkspaceSettingsAsset(extractedDir) {
     throw new Error(`missing webview assets directory ${assetsDir}`);
   }
 
-  const settingsPageAsset = findAgentWorkspaceSettingsPageAsset(assetsDir);
-  const runtimeDependencies = settingsPageAsset == null
-    ? inferRuntimeDependenciesFromSettingsAssets(assetsDir)
-    : null;
+  const runtimeDependencies = inferRuntimeDependenciesFromSettingsAssets(assetsDir);
   let reactAsset;
   let reactExportName;
   if (runtimeDependencies != null) {
     ({ reactAsset, reactExportName } = runtimeDependencies);
-  } else if (settingsPageAsset != null) {
-    const reactFactory = findReactJsxFactoryWebviewAsset(assetsDir);
-    reactAsset = reactFactory.assetName;
-    reactExportName = reactFactory.exportName;
   } else {
     const jsxRuntimeAsset = findRequiredWebviewAsset(
       assetsDir,
@@ -1929,8 +1886,6 @@ function resolveAgentWorkspaceSettingsAsset(extractedDir) {
       chunkAsset,
       reactAsset,
       reactExportName,
-      settingsPageAsset: settingsPageAsset?.assetName,
-      settingsPageExportName: settingsPageAsset?.exportName,
       codexRequestAsset: codexRequestAsset.assetName,
       codexRequestExportName: codexRequestAsset.exportName,
     }),
@@ -1944,11 +1899,13 @@ function isAgentWorkspaceSettingsSharedMetadataBundleSource(currentSource) {
   );
 }
 
+const CURRENT_SETTINGS_ROUTE_PATTERN =
+  /"general-settings":(?=([A-Za-z_$][\w$]*)\(async\(\)=>\(await ([A-Za-z_$][\w$]*)\(async\(\)=>\{let\{GeneralSettings:[A-Za-z_$][\w$]*\}=await import\()/;
+
 function isAgentWorkspaceSettingsRouteBundleSource(currentSource) {
   return (
     currentSource.includes(SETTINGS_ASSET) ||
-    /"general-settings":\(0,[A-Za-z_$][\w$]*\.lazy\)\(\(\)=>[A-Za-z_$][\w$]*\(/.test(currentSource) ||
-    /"general-settings":[A-Za-z_$][\w$]*\(async\(\)=>\(await [A-Za-z_$][\w$]*\(async\(\)=>\{/.test(currentSource)
+    CURRENT_SETTINGS_ROUTE_PATTERN.test(currentSource)
   );
 }
 
@@ -2041,28 +1998,14 @@ function applyAgentWorkspaceSettingsIndexPatch(currentSource) {
   let patchedSource = currentSource;
 
   if (!patchedSource.includes(SETTINGS_ASSET)) {
-    const legacyRoutePattern = /"general-settings":(?=\(0,([A-Za-z_$][\w$]*)\.lazy\)\(\(\)=>([A-Za-z_$][\w$]*)\()/;
-    if (legacyRoutePattern.test(patchedSource)) {
-      patchedSource = patchedSource.replace(
-        legacyRoutePattern,
-        (_match, lazyAlias, preloadAlias) =>
-          `"${SETTINGS_SLUG}":(0,${lazyAlias}.lazy)(()=>${preloadAlias}(()=>import(\`./${SETTINGS_ASSET}\`),[],import.meta.url)),"general-settings":`,
-      );
-      return patchedSource;
+    if (!CURRENT_SETTINGS_ROUTE_PATTERN.test(patchedSource)) {
+      throw new Error("could not add agent workspace settings route");
     }
-
-    const currentRoutePattern =
-      /"general-settings":(?=([A-Za-z_$][\w$]*)\(async\(\)=>\(await ([A-Za-z_$][\w$]*)\(async\(\)=>\{)/;
-    if (currentRoutePattern.test(patchedSource)) {
-      patchedSource = patchedSource.replace(
-        currentRoutePattern,
-        (_match, lazyAlias, preloadAlias) =>
-          `"${SETTINGS_SLUG}":${lazyAlias}(async()=>(await ${preloadAlias}(async()=>import(\`./${SETTINGS_ASSET}\`),[],import.meta.url)).AgentWorkspacesSettings),"general-settings":`,
-      );
-      return patchedSource;
-    }
-
-    throw new Error("could not add agent workspace settings route");
+    patchedSource = patchedSource.replace(
+      CURRENT_SETTINGS_ROUTE_PATTERN,
+      (_match, lazyAlias, preloadAlias) =>
+        `"${SETTINGS_SLUG}":${lazyAlias}(async()=>(await ${preloadAlias}(async()=>{let{default:e}=await import(\`./${SETTINGS_ASSET}\`);return{default:e}},[],import.meta.url)).default),"general-settings":`,
+    );
   }
 
   return patchedSource;
@@ -2113,7 +2056,6 @@ function collectAgentWorkspaceRouteAndNavigationPatches(extractedDir) {
   const candidates = fs
     .readdirSync(assetsDir)
     .filter((name) =>
-      /^(?:(?:app-main|index)-|app-initial~app-main~).*\.js$/.test(name) ||
       /^app-initial~app-main~.*\.js$/.test(name) ||
       /(?:^|~)settings-page(?:[-~].*)?\.js$/.test(name)
     )
@@ -2176,9 +2118,7 @@ function patchAgentWorkspaceSettingsAssets(extractedDir) {
     return { matched: true, changed };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes("could not find JSX runtime asset")) {
-      console.warn(`WARN: Agent Workspaces settings patch skipped: ${message}`);
-    }
+    console.warn(`WARN: Agent Workspaces settings patch skipped: ${message}`);
     return { matched: false, changed: 0, reason: message };
   }
 }
@@ -2200,9 +2140,7 @@ module.exports = {
       apply: (extractedDir) => patchAgentWorkspaceSettingsAssets(extractedDir),
       status: (result, warnings) => {
         if (result?.matched === false) {
-          const reason = result.reason ?? warnings[0] ?? null;
-          if (String(reason).includes("could not find JSX runtime asset")) return "already-applied";
-          return { status: "skipped-optional", reason };
+          return { status: "skipped-optional", reason: result.reason ?? warnings[0] ?? null };
         }
         if ((result?.changed ?? 0) > 0) {
           return "applied";

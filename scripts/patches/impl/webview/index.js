@@ -16,7 +16,6 @@ const LINUX_SAFE_MONOSPACE_FONT_STACK =
   "\"Noto Sans Mono\", \"DejaVu Sans Mono\", \"Liberation Mono\", \"Ubuntu Mono\", ui-monospace, \"SFMono-Regular\", \"SF Mono\", Menlo, Consolas, monospace";
 const LINUX_TOOLTIP_COLLISION_PADDING_TOP = 44;
 const LINUX_WINDOW_CONTROLS_SAFE_AREA_RIGHT = 138;
-const JS_IDENTIFIER = "[A-Za-z_$][\\w$]*";
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_THREAD_RUNTIME_MARKER = "codexLinuxRemoteMobileThreadRuntimeStatus";
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_UNKNOWN_TURN_MARKER = "codexLinuxRemoteMobileHydrateUnknownTurn";
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_QUEUE_MARKER = "codexLinuxRemoteMobileNotificationQueue";
@@ -48,163 +47,31 @@ function applyLinuxSafeMonospaceFontStackPatch(currentSource) {
 }
 
 function applyLinuxOpaqueWindowsDefaultPatch(currentSource) {
-  let patchedSource = currentSource;
-  let warnedMissingNeedle = false;
-  const mergeDefaultPatched = () =>
-    patchedSource.includes("opaqueWindows:e?.opaqueWindows??(typeof navigator<`u`&&");
-  const settingsDefaultPatched = () =>
-    patchedSource.includes("navigator.userAgent.includes(`Linux`)&&r?.opaqueWindows==null") ||
-    patchedSource.includes("navigator.userAgent.includes(`Linux`)&&x?.opaqueWindows==null") ||
-    /navigator\.userAgent\.includes\(`Linux`\)&&[A-Za-z_$][\w$]*\?\.opaqueWindows==null/u.test(patchedSource);
-  const runtimeDefaultPatched = () =>
-    patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&((o===`light`?l:f)?.opaqueWindows==null") ||
-    patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&((s===`light`?u:p)?.opaqueWindows==null") ||
-    patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&g.opaqueWindows==null&&(g={...g,opaqueWindows:!0})") ||
-    /useState\)\(document\.documentElement\.dataset\.codexOs===`linux`\)/.test(patchedSource) ||
-    /document\.documentElement\.dataset\.codexOs===`linux`&&\(\([A-Za-z_$][\w$]*===`light`\?[A-Za-z_$][\w$]*:[A-Za-z_$][\w$]*\)\?\.opaqueWindows==null/u.test(patchedSource);
-  const linuxDefaultPatched = () =>
-    mergeDefaultPatched() || settingsDefaultPatched() || runtimeDefaultPatched();
-  const warnMissingNeedle = () => {
-    if (warnedMissingNeedle || linuxDefaultPatched()) {
-      return;
-    }
-    warnedMissingNeedle = true;
-    console.warn(
-      "WARN: Could not find Linux opaque window default insertion point — skipping settings default patch",
-    );
-  };
-
-  const mergeNeedle = "opaqueWindows:e?.opaqueWindows??n.opaqueWindows,semanticColors:";
-  const mergePatch =
-    "opaqueWindows:e?.opaqueWindows??(typeof navigator<`u`&&((navigator.userAgentData?.platform??navigator.platform??navigator.userAgent).toLowerCase().includes(`linux`))?!0:n.opaqueWindows),semanticColors:";
-
-  if (mergeDefaultPatched()) {
-    // Already patched.
-  } else if (patchedSource.includes(mergeNeedle)) {
-    patchedSource = patchedSource.replace(mergeNeedle, mergePatch);
-  } else if (patchedSource.includes("opaqueWindows") && patchedSource.includes("semanticColors")) {
-    warnMissingNeedle();
+  if (
+    /navigator\.userAgent\.includes\(`Linux`\)&&[A-Za-z_$][\w$]*\?\.opaqueWindows==null/u.test(
+      currentSource,
+    )
+  ) {
+    return currentSource;
   }
 
-  const settingsNeedle =
-    "let d=ot(r,e),f=at(e),p={codeThemeId:tt(a,e).id,theme:d},";
-  const settingsPatch =
-    "let d=ot(r,e);navigator.userAgent.includes(`Linux`)&&r?.opaqueWindows==null&&(d={...d,opaqueWindows:!0});let f=at(e),p={codeThemeId:tt(a,e).id,theme:d},";
-  if (patchedSource.includes("navigator.userAgent.includes(`Linux`)&&r?.opaqueWindows==null")) {
-    // Already patched.
-  } else if (patchedSource.includes(settingsNeedle)) {
-    patchedSource = patchedSource.replace(settingsNeedle, settingsPatch);
-  }
-
-  const currentSettingsNeedle = "setThemePatch:b,theme:x}=ne(t),S=$t(i,t),";
-  const currentSettingsPatch =
-    "setThemePatch:b,theme:x}=ne(t);navigator.userAgent.includes(`Linux`)&&x?.opaqueWindows==null&&(x={...x,opaqueWindows:!0});let S=$t(i,t),";
-  if (patchedSource.includes("navigator.userAgent.includes(`Linux`)&&x?.opaqueWindows==null")) {
-    // Already patched.
-  } else if (patchedSource.includes(currentSettingsNeedle)) {
-    patchedSource = patchedSource.replace(currentSettingsNeedle, currentSettingsPatch);
-  }
-
-  const currentSettingsRegex =
-    /setThemePatch:([A-Za-z_$][\w$]*),theme:([A-Za-z_$][\w$]*)\}=([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\),([A-Za-z_$][\w$]*)=/;
-  if (patchedSource.includes("navigator.userAgent.includes(`Linux`)&&x?.opaqueWindows==null")) {
-    // Already patched by the current-settings branch above.
-  } else if (/navigator\.userAgent\.includes\(`Linux`\)&&[A-Za-z_$][\w$]*\?\.opaqueWindows==null/.test(patchedSource)) {
-    // Already patched with drifted minified names.
-  } else if (currentSettingsRegex.test(patchedSource)) {
-    patchedSource = patchedSource.replace(
-      currentSettingsRegex,
-      (match, setThemePatchVar, themeVar, hookVar, variantVar, nextVar) =>
+  const settingsPattern =
+    /setThemePatch:([A-Za-z_$][\w$]*),theme:([A-Za-z_$][\w$]*)\}=([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\),([A-Za-z_$][\w$]*)=/u;
+  if (settingsPattern.test(currentSource)) {
+    return currentSource.replace(
+      settingsPattern,
+      (_match, setThemePatchVar, themeVar, hookVar, variantVar, nextVar) =>
         `setThemePatch:${setThemePatchVar},theme:${themeVar}}=${hookVar}(${variantVar});navigator.userAgent.includes(\`Linux\`)&&${themeVar}?.opaqueWindows==null&&(${themeVar}={...${themeVar},opaqueWindows:!0});let ${nextVar}=`,
     );
   }
 
-  const runtimeNeedle =
-    "let T=o===`light`?C:w,E;if(T.opaqueWindows&&!XZ()){";
-  const runtimePatch =
-    "let T=o===`light`?C:w,E;document.documentElement.dataset.codexOs===`linux`&&((o===`light`?l:f)?.opaqueWindows==null&&(T={...T,opaqueWindows:!0}));if(T.opaqueWindows&&!XZ()){";
-  if (patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&((o===`light`?l:f)?.opaqueWindows==null")) {
-    // Already patched.
-  } else if (patchedSource.includes(runtimeNeedle)) {
-    patchedSource = patchedSource.replace(runtimeNeedle, runtimePatch);
+  if (currentSource.includes("opaqueWindows") && currentSource.includes("setThemePatch")) {
+    console.warn(
+      "WARN: Could not find Linux opaque window default insertion point — skipping settings default patch",
+    );
   }
 
-  const currentRuntimeNeedle = "let T=s===`light`?S:w,E;";
-  const currentRuntimePatch =
-    "let T=s===`light`?S:w,E;document.documentElement.dataset.codexOs===`linux`&&((s===`light`?u:p)?.opaqueWindows==null&&(T={...T,opaqueWindows:!0}));";
-  if (patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&((s===`light`?u:p)?.opaqueWindows==null")) {
-    // Already patched.
-  } else if (patchedSource.includes(currentRuntimeNeedle)) {
-    patchedSource = patchedSource.replace(currentRuntimeNeedle, currentRuntimePatch);
-  }
-
-  const appMainRuntimeNeedle =
-    "if((g.opaqueWindows||i)&&!pc()){e.classList.add(`electron-opaque`);return}";
-  const appMainRuntimePatch =
-    "if(document.documentElement.dataset.codexOs===`linux`&&g.opaqueWindows==null&&(g={...g,opaqueWindows:!0}),(g.opaqueWindows||i)&&!pc()){e.classList.add(`electron-opaque`);return}";
-  if (patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&g.opaqueWindows==null&&(g={...g,opaqueWindows:!0})")) {
-    // Already patched.
-  } else if (patchedSource.includes(appMainRuntimeNeedle)) {
-    patchedSource = patchedSource.replace(appMainRuntimeNeedle, appMainRuntimePatch);
-  }
-
-  const appMainStatePatched = () =>
-    /useState\)\(document\.documentElement\.dataset\.codexOs===`linux`\)/.test(patchedSource);
-  const appMainStateRegex =
-    /\[([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\]=\(0,([A-Za-z_$][\w$]*)\.useState\)\(!1\),([A-Za-z_$][\w$]*)=/;
-  if (!appMainStatePatched() && currentSource.includes("electron-window-opaque-surface-changed")) {
-    const eventIndex = patchedSource.indexOf("electron-window-opaque-surface-changed");
-    const prefixStart = Math.max(0, eventIndex - 2000);
-    const prefix = patchedSource.slice(prefixStart, eventIndex);
-    const stateMatches = [...prefix.matchAll(new RegExp(appMainStateRegex.source, "g"))];
-    const stateMatch = stateMatches[stateMatches.length - 1];
-    if (stateMatch?.index != null) {
-      const [match, stateVar, setterVar, reactVar, nextVar] = stateMatch;
-      const replacement =
-        `[${stateVar},${setterVar}]=(0,${reactVar}.useState)(document.documentElement.dataset.codexOs===\`linux\`),${nextVar}=`;
-      const matchStart = prefixStart + stateMatch.index;
-      patchedSource =
-        patchedSource.slice(0, matchStart) +
-        replacement +
-        patchedSource.slice(matchStart + match.length);
-    }
-  }
-
-  if (!runtimeDefaultPatched()) {
-    const currentRuntimeRegex =
-      /let\{data:([A-Za-z_$][\w$]*)\}=Qc\([A-Za-z_$][\w$]*\.APPEARANCE_LIGHT_CHROME_THEME,[A-Za-z_$][\w$]*\).*?let\{data:([A-Za-z_$][\w$]*)\}=Qc\([A-Za-z_$][\w$]*\.APPEARANCE_DARK_CHROME_THEME,[A-Za-z_$][\w$]*\).*?let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)===`light`\?([A-Za-z_$][\w$]*):([A-Za-z_$][\w$]*),/;
-    const currentRuntimeMatch = patchedSource.match(currentRuntimeRegex);
-    if (currentRuntimeMatch != null) {
-      const [
-        ,
-        lightThemeRawVar,
-        darkThemeRawVar,
-        selectedThemeVar,
-        resolvedVariantVar,
-        lightThemeVar,
-        darkThemeVar,
-      ] = currentRuntimeMatch;
-      const selectorNeedle =
-        `let ${selectedThemeVar}=${resolvedVariantVar}===\`light\`?${lightThemeVar}:${darkThemeVar},`;
-      const selectorPatch =
-        `let ${selectedThemeVar}=${resolvedVariantVar}===\`light\`?${lightThemeVar}:${darkThemeVar};document.documentElement.dataset.codexOs===\`linux\`&&((${resolvedVariantVar}===\`light\`?${lightThemeRawVar}:${darkThemeRawVar})?.opaqueWindows==null&&(${selectedThemeVar}={...${selectedThemeVar},opaqueWindows:!0}));let `;
-      if (patchedSource.includes(selectorNeedle)) {
-        patchedSource = patchedSource.replace(selectorNeedle, selectorPatch);
-      }
-    }
-  }
-
-  if (
-    patchedSource === currentSource &&
-    !linuxDefaultPatched() &&
-    (currentSource.includes("opaqueWindows") ||
-      currentSource.includes("electron-opaque") ||
-      currentSource.includes("translucentSidebar"))
-  ) {
-    warnMissingNeedle();
-  }
-
-  return patchedSource;
+  return currentSource;
 }
 
 function applyLinuxWindowControlsSafeAreaPatch(currentSource) {
@@ -722,17 +589,15 @@ function applyLinuxAppServerFeatureEnablementPatch(currentSource) {
 }
 
 function applyAutomationUpdateEagerToolPatch(currentSource) {
-  const marker = "name===`automation_update`&&delete codexLinuxAutomationTool.deferLoading";
-  if (currentSource.includes(marker)) {
-    return currentSource;
-  }
-  if (!currentSource.includes("automation_update")) {
+  const markerPattern =
+    /[A-Za-z_$][\w$]*\.name===`automation_update`&&delete [A-Za-z_$][\w$]*\.deferLoading/u;
+  if (markerPattern.test(currentSource)) {
     return currentSource;
   }
 
-  const dynamicToolsRegex =
+  const dynamicToolsPattern =
     /\.map\(([A-Za-z_$][\w$]*)=>\(\{type:`function`,\.\.\.\1,\.\.\.([A-Za-z_$][\w$]*)\.has\(\1\.name\)\?\{\}:\{deferLoading:!0\}\}\)\)/u;
-  if (!dynamicToolsRegex.test(currentSource)) {
+  if (!dynamicToolsPattern.test(currentSource)) {
     if (currentSource.includes("automation_update") && currentSource.includes("deferLoading:!0")) {
       console.warn(
         "WARN: Could not find dynamic tools construction point — skipping automation_update eager tool patch",
@@ -742,9 +607,11 @@ function applyAutomationUpdateEagerToolPatch(currentSource) {
   }
 
   return currentSource.replace(
-    dynamicToolsRegex,
-    (_match, toolVar, eagerToolsVar) =>
-      `.map(${toolVar}=>{let codexLinuxAutomationTool={type:\`function\`,...${toolVar},...${eagerToolsVar}.has(${toolVar}.name)?{}:{deferLoading:!0}};return ${toolVar}.name===\`automation_update\`&&delete codexLinuxAutomationTool.deferLoading,codexLinuxAutomationTool})`,
+    dynamicToolsPattern,
+    (_match, toolVar, eagerToolsVar) => {
+      const descriptorVar = toolVar === "t" ? "codexLinuxAutomationDescriptor" : "t";
+      return `.map(${toolVar}=>{let ${descriptorVar}={type:\`function\`,...${toolVar},...${eagerToolsVar}.has(${toolVar}.name)?{}:{deferLoading:!0}};return ${toolVar}.name===\`automation_update\`&&delete ${descriptorVar}.deferLoading,${descriptorVar}})`;
+    },
   );
 }
 
@@ -940,9 +807,7 @@ function applyLinuxAppServerConversationHydrationPatch(currentSource) {
       patchedSource.includes("t===`needs_resume`?n?.type===`active`")
     ) {
       // Current upstream already preserves threadRuntimeStatus on summaries.
-    } else if (
-      /resumeState===`needs_resume`[^;]{0,120}threadRuntimeStatus=/u.test(patchedSource)
-    ) {
+    } else if (patchedSource.includes("threadRuntimeStatus") && patchedSource.includes("resumeState")) {
       console.warn(
         "WARN: Could not find app-server conversation runtime-status needle — skipping Linux app-server hydration runtime-status patch",
       );
@@ -1001,38 +866,26 @@ function applyLinuxAppServerConversationHydrationPatch(currentSource) {
 }
 
 function applyLinuxCompletedItemRecoveryPatch(currentSource) {
-  const malformedCompletedItemRecovery =
-    /firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\}\);let codexLinuxCompletedItemExists/g;
-  if (malformedCompletedItemRecovery.test(currentSource)) {
-    return currentSource.replace(
-      malformedCompletedItemRecovery,
-      "firstTurnWorkItemStartedAtMs??Date.now());let codexLinuxCompletedItemExists",
-    );
-  }
-
   if (currentSource.includes("codexLinuxCompletedItemExists=")) {
     return currentSource;
   }
 
   const completedItemDropPattern =
-    /yV\(([A-Za-z_$][\w$]*)\)&&\(([A-Za-z_$][\w$]*)\.firstTurnWorkItemStartedAtMs=\2\.firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\),!\(\1\.type!==`subAgentActivity`&&!LB\(\2,\1\.id,\1\.type\)\)&&\(\1\.type,bP\(\2,([A-Za-z_$][\w$]*)\)\)/u;
+    /([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)&&\(([A-Za-z_$][\w$]*)\.firstTurnWorkItemStartedAtMs=\3\.firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\),!\(\2\.type!==`subAgentActivity`&&!([A-Za-z_$][\w$]*)\(\3,\2\.id,\2\.type\)\)&&\(\2\.type,([A-Za-z_$][\w$]*)\(\3,([A-Za-z_$][\w$]*)\)\)/u;
 
   if (completedItemDropPattern.test(currentSource)) {
     return currentSource.replace(
       completedItemDropPattern,
-      (_match, completedItemVar, turnVar, viewItemVar) =>
-        `yV(${completedItemVar})&&(${turnVar}.firstTurnWorkItemStartedAtMs=${turnVar}.firstTurnWorkItemStartedAtMs??Date.now());let codexLinuxCompletedItemExists=${turnVar}.items.some(e=>e.id===${viewItemVar}.id);if(${completedItemVar}.type!==\`subAgentActivity\`&&codexLinuxCompletedItemExists&&!LB(${turnVar},${completedItemVar}.id,${completedItemVar}.type))return;bP(${turnVar},${viewItemVar})`,
-    );
-  }
-
-  const modernCompletedItemDropPattern =
-    /([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)&&\(([A-Za-z_$][\w$]*)\.firstTurnWorkItemStartedAtMs=\3\.firstTurnWorkItemStartedAtMs\?\?Date\.now\(\)\),!\(\2\.type!==`subAgentActivity`&&!([A-Za-z_$][\w$]*)\(\3,\2\.id,\2\.type\)\)&&\(\2\.type,([A-Za-z_$][\w$]*)\(\3,([A-Za-z_$][\w$]*)\)\)/u;
-
-  if (modernCompletedItemDropPattern.test(currentSource)) {
-    return currentSource.replace(
-      modernCompletedItemDropPattern,
-      (_match, workItemGuardFn, completedItemVar, turnVar, lookupFn, appendItemFn, viewItemVar) =>
-        `${workItemGuardFn}(${completedItemVar})&&(${turnVar}.firstTurnWorkItemStartedAtMs=${turnVar}.firstTurnWorkItemStartedAtMs??Date.now());let codexLinuxCompletedItemExists=${turnVar}.items.some(e=>e.id===${viewItemVar}.id);if(${completedItemVar}.type!==\`subAgentActivity\`&&codexLinuxCompletedItemExists&&!${lookupFn}(${turnVar},${completedItemVar}.id,${completedItemVar}.type))return;${appendItemFn}(${turnVar},${viewItemVar})`,
+      (
+        _match,
+        workItemPredicate,
+        completedItemVar,
+        turnVar,
+        findItemFn,
+        upsertItemFn,
+        viewItemVar,
+      ) =>
+        `${workItemPredicate}(${completedItemVar})&&(${turnVar}.firstTurnWorkItemStartedAtMs=${turnVar}.firstTurnWorkItemStartedAtMs??Date.now());let codexLinuxCompletedItemExists=${turnVar}.items.some(e=>e.id===${viewItemVar}.id);if(${completedItemVar}.type!==\`subAgentActivity\`&&codexLinuxCompletedItemExists&&!${findItemFn}(${turnVar},${completedItemVar}.id,${completedItemVar}.type))return;${upsertItemFn}(${turnVar},${viewItemVar})`,
     );
   }
 
@@ -1246,23 +1099,6 @@ function applyLinuxI18nGatePatch(currentSource) {
   return patchedSource;
 }
 
-function applyLinuxProfileSettingsMenuPatch(currentSource) {
-  if (!currentSource.includes("codex.profileDropdown.settingsPage")) {
-    return currentSource;
-  }
-
-  const patchedSource = currentSource.replace(
-    /([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(`4166894088`\)/g,
-    "$1=!0",
-  );
-
-  if (currentSource.includes("4166894088") && patchedSource === currentSource) {
-    console.warn("WARN: Could not find profile settings menu gate needle — skipping Linux settings menu patch");
-  }
-
-  return patchedSource;
-}
-
 function applyLinuxConfigWriteVersionConflictPatch(currentSource) {
   if (!currentSource.includes("expectedVersion:")) {
     return currentSource;
@@ -1380,13 +1216,26 @@ function applyLocalEnvironmentActionModalDraftPatch(currentSource) {
   const statePatch =
     `workspaceRoot:${workspaceVar}}=${paramVar},[codexLinuxActionDraft,codexLinuxSetActionDraft]=(0,${reactVar}.useState)(()=>${actionVar}),codexLinuxUpdateActionDraft=codexLinuxPatch=>(codexLinuxSetActionDraft(codexLinuxDraft=>({...codexLinuxDraft,...codexLinuxPatch})),${updateVar}(codexLinuxPatch)),`;
   const memoGuardPattern = new RegExp(
-    `${cacheVar}\\[(\\d+)\\]!==${actionVar}\\|\\|`,
+    String.raw`if\(${cacheVar}\[(\d+)\]!==${actionVar}\|\|`,
   );
+  const memoGuardMatch = patchedFunction.match(memoGuardPattern);
+  if (memoGuardMatch == null) {
+    console.warn(
+      "WARN: Could not find local environment action modal modal memo guard — skipping action input patch",
+    );
+    return currentSource;
+  }
+  const memoGuardSlot = memoGuardMatch[1];
   const requiredReplacements = [
     {
       needle: stateNeedle,
       replacement: statePatch,
       description: "draft state insertion point",
+    },
+    {
+      needle: memoGuardMatch[0],
+      replacement: `if(${cacheVar}[${memoGuardSlot}]!==codexLinuxActionDraft||${cacheVar}[${memoGuardSlot}]!==${actionVar}||`,
+      description: "modal memo guard",
     },
     {
       needle: `${actionVar}.icon`,
@@ -1437,12 +1286,6 @@ function applyLocalEnvironmentActionModalDraftPatch(currentSource) {
   const missingReplacement = requiredReplacements.find(
     ({ needle }) => !patchedFunction.includes(needle),
   );
-  if (!memoGuardPattern.test(patchedFunction)) {
-    console.warn(
-      "WARN: Could not find local environment action modal modal memo guard — skipping action input patch",
-    );
-    return currentSource;
-  }
   if (missingReplacement != null) {
     console.warn(
       `WARN: Could not find local environment action modal ${missingReplacement.description} — skipping action input patch`,
@@ -1450,11 +1293,6 @@ function applyLocalEnvironmentActionModalDraftPatch(currentSource) {
     return currentSource;
   }
 
-  patchedFunction = patchedFunction.replace(
-    memoGuardPattern,
-    (_match, cacheIndex) =>
-      `${cacheVar}[${cacheIndex}]!==codexLinuxActionDraft||${cacheVar}[${cacheIndex}]!==${actionVar}||`,
-  );
   for (const { needle, replacement } of requiredReplacements) {
     patchedFunction = patchedFunction.replaceAll(needle, replacement);
   }
@@ -2146,38 +1984,6 @@ function applyLinuxSkillsListDedupePatch(currentSource) {
     .replace("function IJ(e){return e.skills}", `${helper}function IJ(e){return e.skills}`);
 }
 
-function applyLinuxApplyPatchPolicyPatch(currentSource) {
-  if (currentSource.includes("function codexLinuxApplyPatchPolicy(")) {
-    return currentSource;
-  }
-
-  const policy =
-    "For manual file edits, file creation, file deletion, and small targeted changes, use apply_patch. Do not use shell redirection, heredocs, Python/Node file writes, sed -i, perl -pi, tee, or cat > for hand-authored edits. Use shell-based generation only for generated files, formatter output, broad mechanical rewrites, or when apply_patch fails.";
-  const helper =
-    `function codexLinuxApplyPatchPolicy(e){let t=${JSON.stringify(policy)};return typeof e==\`string\`&&e.includes(t)?e:e==null||String(e).trim()===\`\`?t:String(e).trim()+\`\\n\\n\`+t}`;
-  const fieldNeedle = "baseInstructions:c?.baseInstructions??null";
-  const fieldPatch = "baseInstructions:codexLinuxApplyPatchPolicy(c?.baseInstructions??null)";
-  if (currentSource.includes(fieldNeedle) || currentSource.includes(fieldPatch)) {
-    const targetNeedle = currentSource.includes(fieldNeedle) ? fieldNeedle : fieldPatch;
-    const functionMatch = currentSource.match(new RegExp(`async function ${JS_IDENTIFIER}\\([^)]*approvalsReviewer[^)]*\\)\\{[\\s\\S]{0,1600}?${escapeRegExp(targetNeedle)}`));
-    const functionNeedle = functionMatch?.[0].match(/async function [A-Za-z_$][\w$]*\(/)?.[0];
-    if (functionNeedle == null) return currentSource;
-    return currentSource
-      .replace(fieldNeedle, fieldPatch)
-      .replace(functionNeedle, `${helper}${functionNeedle}`);
-  }
-
-  const startRequestMatch = currentSource.match(/function ([A-Za-z_$][\w$]*)\(\{[\s\S]{0,700}?baseInstructions:([A-Za-z_$][\w$]*)[\s\S]{0,1800}?,baseInstructions:\2,additionalDeveloperInstructions:/);
-  if (startRequestMatch != null) {
-    const [match, functionName, instructionsVar] = startRequestMatch;
-    return currentSource
-      .replace(`function ${functionName}(`, `${helper}function ${functionName}(`)
-      .replace(match, match.replace(`,baseInstructions:${instructionsVar},additionalDeveloperInstructions:`, `,baseInstructions:codexLinuxApplyPatchPolicy(${instructionsVar}),additionalDeveloperInstructions:`));
-  }
-
-  return currentSource;
-}
-
 function patchCommentPreloadBundle(extractedDir) {
   const commentPreloadBundle = path.join(extractedDir, ".vite", "build", "comment-preload.js");
   if (!fs.existsSync(commentPreloadBundle)) {
@@ -2203,7 +2009,6 @@ module.exports = {
   applyLinuxCompletedItemRecoveryPatch,
   applyLinuxRemoteTerminalStatusRecoveryPatch,
   applyLinuxAppServerFeatureEnablementPatch,
-  applyLinuxApplyPatchPolicyPatch,
   applyAutomationUpdateEagerToolPatch,
   applyLinuxChatSearchHydrationPatch,
   applyLinuxBrowserUseAvailabilityPatch,
@@ -2211,7 +2016,6 @@ module.exports = {
   applyLinuxBrowserUseNonLocalNavigationPatch,
   applyLinuxConfigWriteVersionConflictPatch,
   applyLinuxI18nGatePatch,
-  applyLinuxProfileSettingsMenuPatch,
   applyPersistentRateLimitFooterPatch,
   applyLinuxAppSunsetPatch,
   applyLinuxOpaqueWindowsDefaultPatch,

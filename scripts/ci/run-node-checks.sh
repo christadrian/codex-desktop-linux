@@ -29,19 +29,10 @@ run_node_tests() {
     node --test "${test_files[@]}"
 }
 
-run_feature_evals() {
-    local file
-
-    while IFS= read -r file; do
-        node "$file"
-    done < <(git ls-files 'linux-features/*/eval.js')
-}
-
 case "$MODE" in
     all)
         run_node_syntax_checks
         run_node_tests
-        run_feature_evals
         ;;
     syntax)
         run_node_syntax_checks

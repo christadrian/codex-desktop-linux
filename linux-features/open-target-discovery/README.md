@@ -1,9 +1,6 @@
 # Open Target Discovery
 
-Current `open-in-targets` directory detection selects native Linux file-manager
-targets for folders.
-
-Optional Linux open-target integration for Codex Desktop.
+Optional Linux open-target integration for ChatGPT Desktop.
 
 When enabled, this feature augments the upstream open-target menu with:
 

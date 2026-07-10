@@ -153,11 +153,11 @@ function syntheticSettingsShared() {
   ].join("");
 }
 
-function syntheticAppMainRouteRegistry() {
+function syntheticCurrentAppMainRouteRegistry() {
   return [
-    "function render(e){return routeMap[e.slug]}",
-    "var routeMap={\"general-settings\":(0,Q.lazy)(()=>Mr(()=>import(`./general-settings.js`).then(e=>({default:e.GeneralSettings})),__vite__mapDeps([1,2]),import.meta.url)),",
-    "\"keyboard-shortcuts\":(0,Q.lazy)(()=>Mr(()=>import(`./keyboard-shortcuts-settings.js`).then(e=>({default:e.KeyboardShortcutsSettings})),__vite__mapDeps([3]),import.meta.url))};",
+    "function render(e){return currentRouteMap[e.slug]}",
+    'var currentRouteMap={"general-settings":BN(async()=>(await Y(async()=>{let{GeneralSettings:e}=await import(`./general-settings-TbWU8D8b.js`);return{GeneralSettings:e}},__vite__mapDeps([1,2]),import.meta.url)).GeneralSettings),',
+    'import:BN(async()=>(await Y(async()=>{let{ImportSettings:e}=await import(`./import-settings-DmsueF_s.js`);return{ImportSettings:e}},__vite__mapDeps([3]),import.meta.url)).ImportSettings)};',
   ].join("");
 }
 
@@ -228,14 +228,7 @@ function rewriteSettingsAssetsWithConsolidatedCurrentLayout(assetsDir) {
   );
   fs.writeFileSync(
     path.join(assetsDir, "app-initial~app-main~automations-page-test.js"),
-    [
-      "function EH(e){let t=(0,DH.c)(2),{slug:n}=e,r=AH[n],i;return t[0]===r?i=t[1]:(i=(0,kH.jsx)(r,{}),t[0]=r,t[1]=i),i}",
-      "var DH,OH,kH,AH,jH=e((()=>{DH=q(),OH=t(J(),1),kH=Y(),AH={",
-      '"linux-desktop":(0,OH.lazy)(()=>Cs(()=>import(`./linux-desktop-settings-linux.js`),[],import.meta.url)),',
-      '"general-settings":(0,OH.lazy)(()=>Cs(()=>import(`./general-settings-nSa2QlZR.js`).then(e=>({default:e.GeneralSettings})),__vite__mapDeps([1]),import.meta.url)),',
-      '"keyboard-shortcuts":(0,OH.lazy)(()=>Cs(()=>import(`./keyboard-shortcuts-settings-B1AsiCWy.js`).then(e=>({default:e.KeyboardShortcutsSettings})),__vite__mapDeps([2]),import.meta.url))',
-      "}}));",
-    ].join(""),
+    syntheticCurrentAppMainRouteRegistry(),
   );
 }
 
@@ -1599,16 +1592,11 @@ test("settings asset patches add navigation, route, visibility, and title", () =
   assert.match(shared, new RegExp(`settings\\.section\\.${SETTINGS_SLUG}`));
   assert.equal(applyAgentWorkspaceSettingsSharedPatch(shared), shared);
 
-  const appMain = applyAgentWorkspaceSettingsIndexPatch(syntheticAppMainRouteRegistry());
-  assert.match(appMain, new RegExp(SETTINGS_ASSET));
-  assert.doesNotMatch(appMain, new RegExp(`"${SETTINGS_SLUG}":Icon`));
-  assert.equal(applyAgentWorkspaceSettingsIndexPatch(appMain), appMain);
-
-  const currentAppMain = applyAgentWorkspaceSettingsIndexPatch(
-    'var routes={"general-settings":BN(async()=>(await Y(async()=>{let{GeneralSettings:e}=await import(`./general-settings-current.js`);return{GeneralSettings:e}},deps,import.meta.url)).GeneralSettings)};',
+  const currentAppMain = applyAgentWorkspaceSettingsIndexPatch(syntheticCurrentAppMainRouteRegistry());
+  assert.match(
+    currentAppMain,
+    /"agent-workspaces":BN\(async\(\)=>\(await Y\(async\(\)=>\{let\{default:e\}=await import\(`\.\/agent-workspaces-linux\.js`\);return\{default:e\}\},\[\],import\.meta\.url\)\)\.default\),"general-settings":/,
   );
-  assert.match(currentAppMain, new RegExp(SETTINGS_ASSET));
-  assert.match(currentAppMain, /\.AgentWorkspacesSettings/);
   assert.equal(applyAgentWorkspaceSettingsIndexPatch(currentAppMain), currentAppMain);
 
   const settingsPage = applyAgentWorkspaceSettingsPagePatch(
@@ -1745,35 +1733,8 @@ test("agent-workspace settings patch supports consolidated current settings bund
 
     const routeSource = fs.readFileSync(path.join(assetsDir, "app-initial~app-main~automations-page-test.js"), "utf8");
     assert.match(routeSource, new RegExp(SETTINGS_ASSET));
-    assert.match(routeSource, /"agent-workspaces":\(0,OH\.lazy\)\(\(\)=>Cs\(\(\)=>import\(`\.\/agent-workspaces-linux\.js`\),\[\],import\.meta\.url\)\),"general-settings":/);
+    assert.match(routeSource, /"agent-workspaces":BN\(async\(\)=>\(await Y\(/);
     assert.equal(patchAgentWorkspaceSettingsAssets(tempApp).changed, 0);
-  } finally {
-    fs.rmSync(tempApp, { recursive: true, force: true });
-  }
-});
-
-test("agent-workspace settings resolve current JSX factory and Linux settings layout assets", () => {
-  const tempApp = fs.mkdtempSync(path.join(os.tmpdir(), "codex-agent-workspace-current-jsx-"));
-  try {
-    const { assetsDir } = writeSyntheticExtractedApp(tempApp);
-    fs.rmSync(path.join(assetsDir, "react-test.js"), { force: true });
-    fs.rmSync(path.join(assetsDir, "settings-content-layout-test.js"), { force: true });
-    fs.writeFileSync(
-      path.join(assetsDir, "app-initial~settings-page-test.js"),
-      'import{n as r}from"./chunk-test.js";var vt=r((()=>{var e=Symbol.for(`react.transitional.element`);return{jsx(){return e},jsxs(){return e}}})),yt=r(((e,t)=>{t.exports=vt()}));export{yt as vl};',
-    );
-    fs.writeFileSync(path.join(assetsDir, "linux-settings-page-linux.js"), "function t(){}export{t};");
-
-    const { value: result, warnings } = captureWarns(() => patchAgentWorkspaceSettingsAssets(tempApp));
-
-    assert.equal(result.matched, true);
-    assert.ok(
-      warnings.every((warning) => !warning.includes("Agent Workspaces")),
-      warnings.join("\n"),
-    );
-    const settingsSource = fs.readFileSync(path.join(assetsDir, SETTINGS_ASSET), "utf8");
-    assert.match(settingsSource, /import\{vl as __reactFactory\}from"\.\/app-initial~settings-page-test\.js"/);
-    assert.match(settingsSource, /import\{t as SettingsPage\}from"\.\/linux-settings-page-linux\.js"/);
   } finally {
     fs.rmSync(tempApp, { recursive: true, force: true });
   }
