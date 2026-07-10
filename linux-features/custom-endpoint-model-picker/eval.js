@@ -51,6 +51,24 @@ const scenarios = [
     },
   },
   {
+    name: "custom endpoint picker composes with API key visibility",
+    run() {
+      const source = 'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`&&e!==`apikey`/*codexLinuxApiKeyModelVisibility*/,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){s.push(n)}}),{models:s,defaultModel:c}}';
+      const warnings = [];
+      const originalWarn = console.warn;
+      console.warn = (...args) => warnings.push(args.join(" "));
+      let patched;
+      try {
+        patched = applyModelPickerAllowlistPatch(source);
+      } finally {
+        console.warn = originalWarn;
+      }
+      assert.match(patched, /l=!1,u=/);
+      assert.doesNotMatch(patched, /codexLinuxApiKeyModelVisibility/);
+      assert.equal(warnings.length, 0);
+    },
+  },
+  {
     name: "catalog order is authoritative for picker models",
     run() {
       const source = 'var nB=class{async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result} }';

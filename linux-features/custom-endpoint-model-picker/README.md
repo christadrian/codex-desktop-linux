@@ -63,6 +63,8 @@ accepted.
    suppresses the picker, and (when the catalog is readable at build time)
    bakes the catalog into the picker component, the dynamic
    `available_models` config, and the composer/slash-command menu model reads.
+   The guard removal composes with the optional `api-key-model-visibility`
+   feature when both features patch the same model-list bundle.
    Custom endpoints also bypass the upstream Ultra rollout gate, so a catalog
    entry declaring `ultra` exposes both Advanced and Ultra controls.
 3. **Recent-threads webview bundle** — `modelProviders: []` +

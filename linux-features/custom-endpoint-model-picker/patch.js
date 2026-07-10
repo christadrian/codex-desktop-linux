@@ -8,8 +8,13 @@ const path = require("node:path");
 // Webview needles
 // ---------------------------------------------------------------------------
 
-const PICKER_NEEDLE = /((?:let )?\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==`amazonBedrock`([,;])/;
-const PICKER_CURRENT_NEEDLE = /(,\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==`amazonBedrock`(;return \w+\.forEach\()/;
+const API_KEY_VISIBILITY_SUFFIX = String.raw`(?:&&\w+!==\`apikey\`\/\*codexLinuxApiKeyModelVisibility\*\/)?`;
+const PICKER_NEEDLE = new RegExp(
+  String.raw`((?:let )?\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==\`amazonBedrock\`${API_KEY_VISIBILITY_SUFFIX}([,;])`,
+);
+const PICKER_CURRENT_NEEDLE = new RegExp(
+  String.raw`(,\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==\`amazonBedrock\`${API_KEY_VISIBILITY_SUFFIX}(;return \w+\.forEach\()`,
+);
 const PICKER_CURRENT_APPLIED = /function \w+\(\{authMethod:\w+,availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:\w+,models:\w+,useHiddenModels:\w+\}\)\{let \w+=\[\],\w+=null,\w+=!1,/;
 // Applied-detection that also holds when the catalog injection sits between
 // the function head and the declaration list (stale-rebuild re-patch case).

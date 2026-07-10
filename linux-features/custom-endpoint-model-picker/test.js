@@ -32,6 +32,10 @@ const currentPickerFixture =
   'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
 const currentPickerPatched =
   'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let __codexLinuxCustomEndpointUltra=e===`apikey`||e===`apiKey`;i=i||__codexLinuxCustomEndpointUltra;let s=[],c=null,l=!1,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));__codexLinuxCustomEndpointReasoningFallback:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
+const apiKeyVisibilityPickerFixture = currentPickerFixture.replace(
+  'l=o&&e!==`amazonBedrock`',
+  'l=o&&e!==`amazonBedrock`&&e!==`apikey`/*codexLinuxApiKeyModelVisibility*/',
+);
 const dynamicConfigFixture =
   'function cMt(e){let t=Wu(K()).safeParse(e.available_models),n=zu().safeParse(e.use_hidden_models),r=K().safeParse(e.default_model);return{availableModels:new Set(t.success?t.data:vq),useHiddenModels:n.success?n.data:yq.useHiddenModels,defaultModel:r.success?r.data:yq.defaultModel}}';
 const composerMenuFixture =
@@ -205,6 +209,13 @@ test("model picker allowlist patch applies and is idempotent", () => {
 test("model picker allowlist patch applies to current model-list-filter bundle", () => {
   const patched = applyPatchTwice(applyModelPickerAllowlistPatch, currentPickerFixture);
   assert.equal(patched, currentPickerPatched);
+});
+
+test("model picker allowlist composes with API key model visibility", () => {
+  const { value: patched, warnings } = captureWarns(() =>
+    applyPatchTwice(applyModelPickerAllowlistPatch, apiKeyVisibilityPickerFixture));
+  assert.equal(patched, currentPickerPatched);
+  assert.equal(warnings.length, 0);
 });
 
 test("model picker patch injects catalog fallback from CODEX_HOME", () => {
