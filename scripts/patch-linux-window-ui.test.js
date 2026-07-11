@@ -1373,6 +1373,18 @@ function currentChromePluginCodexAppServerRuntimeBundleFixture() {
   ].join("");
 }
 
+function currentChromePluginIsolatedAppServerRuntimeBundleFixture() {
+  const runtime = currentChromePluginCodexAppServerRuntimeBundleFixture().replace(
+    "async function AV({codexCliPath:e}){return{codexCliPath:e}}",
+    "async function AV(e){let t=e.nativeHostName===nU,n=e.codexCliPath,r=process.env.ISSUE805_ISOLATED_CLI;o.copyFileSync(n,r);o.chmodSync(r,448);return r}",
+  );
+  return [
+    "async function decoy(e){let t=e.nativeHostName===nU;return `decoy`}",
+    "var tU=`.plugin-appserver`,nU=`com.openai.codexextension`;",
+    runtime,
+  ].join("");
+}
+
 function computerUseFeatureBundleFixture() {
   return "function me(e,{env:t=process.env,platform:n=process.platform}={}){return n!==`win32`||t.CODEX_ELECTRON_ENABLE_WINDOWS_COMPUTER_USE!==`1`?e:{...e,computerUse:!0,computerUseNodeRepl:!0}}";
 }
@@ -6779,6 +6791,81 @@ test("uses Linux Codex CLI path for Chrome plugin app-server sync", async () => 
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
     codexCliPath: "/home/josh/.local/bin/codex",
   });
+});
+
+test("keeps the original Linux CLI path when Chrome plugin app-server sync would isolate it", async () => {
+  const patched = applyPatchTwice(
+    applyLinuxChromeNativeHostRuntimePatch,
+    currentChromePluginIsolatedAppServerRuntimeBundleFixture(),
+  );
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-chrome-esm-cli-"));
+  try {
+    const packageDir = path.join(root, "CLI installs");
+    const cliPath = path.join(packageDir, "codex");
+    const isolatedPath = path.join(root, "isolated", "codex");
+    fs.mkdirSync(path.dirname(isolatedPath), { recursive: true });
+    fs.mkdirSync(packageDir, { recursive: true });
+    fs.writeFileSync(path.join(packageDir, "package.json"), '{"type":"module"}\n');
+    fs.writeFileSync(path.join(packageDir, "dependency.js"), 'export const version = "esm-ok";\n');
+    fs.writeFileSync(
+      cliPath,
+      '#!/usr/bin/env node\nimport { version } from "./dependency.js";\nconsole.log(version);\n',
+    );
+    fs.chmodSync(cliPath, 0o700);
+
+    const result = await vm.runInNewContext(
+      `${patched};VH({resourcesPath:"/opt/codex/resources",devRuntimeRepoRoot:null,nativeHostName:"com.openai.codexextension"});`,
+      {
+        require,
+        process: {
+          platform: "linux",
+          env: {
+            CODEX_CLI_PATH: cliPath,
+            ISSUE805_ISOLATED_CLI: isolatedPath,
+            PATH: "",
+          },
+        },
+      },
+    );
+
+    assert.equal(result, cliPath);
+    assert.equal(fs.existsSync(isolatedPath), false);
+    assert.match(patched, /async function decoy\(e\)\{let t=e\.nativeHostName===nU;return `decoy`\}/);
+    const execution = spawnSync(result, [], { encoding: "utf8" });
+    assert.equal(execution.status, 0, execution.stderr);
+    assert.equal(execution.stdout.trim(), "esm-ok");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("preserves Chrome plugin app-server isolation outside Linux", async () => {
+  const patched = applyPatchTwice(
+    applyLinuxChromeNativeHostRuntimePatch,
+    currentChromePluginIsolatedAppServerRuntimeBundleFixture(),
+  );
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-chrome-non-linux-cli-"));
+  try {
+    const sourcePath = path.join(root, "source-codex");
+    const isolatedPath = path.join(root, "isolated-codex");
+    fs.writeFileSync(sourcePath, "source");
+
+    const result = await vm.runInNewContext(
+      `${patched};AV({codexCliPath:${JSON.stringify(sourcePath)},nativeHostName:"com.openai.codexextension"});`,
+      {
+        require,
+        process: {
+          platform: "darwin",
+          env: { ISSUE805_ISOLATED_CLI: isolatedPath },
+        },
+      },
+    );
+
+    assert.equal(result, isolatedPath);
+    assert.equal(fs.readFileSync(isolatedPath, "utf8"), "source");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("patches multiple Chrome runtime resolvers in one Electron 42 bundle", () => {
