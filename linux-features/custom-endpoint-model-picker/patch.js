@@ -280,58 +280,15 @@ function applyExtractedAppCatalogModelsPatch(extractedDir) {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar provider filter (unchanged behavior)
+// Sidebar provider filter cleanup
 // ---------------------------------------------------------------------------
 
-// ponytail: old direct loader — kept for older upstream bundles that lack getCompatibleThreadSortKey.
-const SIDEBAR_APPLIED_MARKER = /\.recentConversationSortKey,modelProviders:\[\],archived:!1,sourceKinds:\w+,useStateDbOnly:!0/;
-const SIDEBAR_NEEDLE = /listRecentThreads\(\{cursor:e,limit:t(,useStateDbOnly:\w+(?:=!\d)?)?\}\)\{return this\.params\.requestClient\.sendRequest\(`thread\/list`,\{limit:t,cursor:e,sortKey:this\.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:(\w+)(,useStateDbOnly:\w+)?\}\)\}/;
-
-// ponytail: server contract says modelProviders/sourceKinds [] means all providers + interactive sources.
-const ASYNC_FILTER_REPLACEMENT = `modelProviders:[],archived:!1,sourceKinds:[],useStateDbOnly:!0`;
-const ASYNC_APPLIED_MARKER = /getCompatibleThreadSortKey\([^)]*\),modelProviders:\[\],archived:!1,sourceKinds:\[\],useStateDbOnly:!0/;
-const ASYNC_FILTER_NEEDLE = /(getCompatibleThreadSortKey\([^)]*\),)modelProviders:(?:\w+|null),archived:!1,sourceKinds:\w+,useStateDbOnly:\w+/;
-const ALL_THREADS_FILTER_NEEDLE = /(listAllThreads\(\{modelProviders:)(?:\w+|null)(,archived:[^}]*\})/;
-const SEARCH_THREADS_FILTER_NEEDLE = /(`thread\/search`,\{[^}]*?modelProviders:)(?:\w+|null)(,sourceKinds:)(?:\w+|null)([^}]*\})/;
-const BLANK_THREAD_FILTER_NEEDLE = /let (\w+)=s\.data;if\((\w+)\)\{/;
-const BLANK_THREAD_FILTER_APPLIED_MARKER = /s\.data\.filter\(\w+=>\w+\.name\?\.trim\(\)\)/;
+const EMPTY_PROVIDER_FILTER = /modelProviders:\[\]/g;
 
 function applySidebarProviderFilterPatch(source) {
-  // Already patched — old direct loader path.
-  if (SIDEBAR_APPLIED_MARKER.test(source)) {
-    return source;
-  }
-  // Old direct loader (pre getCompatibleThreadSortKey).
-  if (SIDEBAR_NEEDLE.test(source)) {
-    return source.replace(
-      SIDEBAR_NEEDLE,
-      (_match, paramStateDbOnly = "", sourceKinds) =>
-        `listRecentThreads({cursor:e,limit:t${paramStateDbOnly}}){return this.params.requestClient.sendRequest(\`thread/list\`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:${sourceKinds},useStateDbOnly:!0})}`,
-    );
-  }
-  // Async loader — include all providers, default to interactive sources, then drop blank-title rows.
-  if (ASYNC_FILTER_NEEDLE.test(source)) {
-    source = source.replace(ASYNC_FILTER_NEEDLE, `$1${ASYNC_FILTER_REPLACEMENT}`);
-  }
-  // Keep archived/history/search paths provider-agnostic too. Recent-only
-  // patching leaves old default-endpoint threads invisible after switching
-  // to a custom endpoint.
-  source = source.replace(ALL_THREADS_FILTER_NEEDLE, "$1[]$2");
-  source = source.replace(SEARCH_THREADS_FILTER_NEEDLE, "$1[]$2[]$3");
-  if (!BLANK_THREAD_FILTER_APPLIED_MARKER.test(source) && BLANK_THREAD_FILTER_NEEDLE.test(source)) {
-    source = source.replace(BLANK_THREAD_FILTER_NEEDLE, (_match, dataVar, expandedVar) =>
-      `let ${dataVar}=s.data.filter(e=>e.name?.trim());if(${expandedVar}){`,
-    );
-  }
-  if (ASYNC_APPLIED_MARKER.test(source) || BLANK_THREAD_FILTER_APPLIED_MARKER.test(source)) {
-    return source;
-  }
-  if (source.includes("listRecentThreads") && source.includes("modelProviders:null") && !source.includes("getCompatibleThreadSortKey")) {
-    console.warn(
-      "WARN: Could not find sidebar provider filter — skipping custom-endpoint-model-picker sidebar patch",
-    );
-  }
-  return source;
+  // An empty provider array means no providers on the official endpoint.
+  // Restore the upstream null filter so endpoint switches share one history.
+  return source.replace(EMPTY_PROVIDER_FILTER, "modelProviders:null");
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +296,7 @@ function applySidebarProviderFilterPatch(source) {
 // ---------------------------------------------------------------------------
 
 const ALLOWLIST_ASSET_PATTERN = /^(?:models-and-reasoning-efforts|model-list-filter|app-initial~app-main~.*(?:home-ambient-suggestions-content|onboarding-page|new-thread-panel-page)).*\.js$/;
-const SIDEBAR_ASSET_PATTERN = /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*(?:plugin-detail-page|new-thread-panel-page|thread-app-shell-chrome|remote-conver)).*\.js$/;
+const SIDEBAR_ASSET_PATTERN = /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*)\.js$/;
 
 module.exports = {
   descriptors: [
@@ -395,13 +352,6 @@ module.exports = {
     PICKER_ULTRA_NEEDLE,
     PICKER_COMPOSER_MENU_MARKER,
     PICKER_COMPOSER_MENU_NEEDLES,
-    SIDEBAR_APPLIED_MARKER,
-    SIDEBAR_NEEDLE,
-    ASYNC_APPLIED_MARKER,
-    ASYNC_FILTER_NEEDLE,
-    ALL_THREADS_FILTER_NEEDLE,
-    SEARCH_THREADS_FILTER_NEEDLE,
-    BLANK_THREAD_FILTER_NEEDLE,
-    BLANK_THREAD_FILTER_APPLIED_MARKER,
+    EMPTY_PROVIDER_FILTER,
   },
 };

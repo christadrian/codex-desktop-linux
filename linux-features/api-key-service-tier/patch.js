@@ -144,29 +144,26 @@ function applyApiKeyServiceTierPatch(source) {
 }
 
 function applyCurrentGateAndModelPatch(source) {
-  const gateAlreadyPatched = PATCHED_SERVICE_TIER_GATE.test(source);
-  const modelAlreadyPatched = PATCHED_MODEL_MARKER.test(source);
-  const gateCandidate = gateAlreadyPatched ? source : applyApiKeyServiceTierGatePatch(source);
-  const modelCandidate = modelAlreadyPatched ? source : applyApiKeyModelMarkerPatch(source);
-  const gateReady = gateAlreadyPatched || gateCandidate !== source;
-  const modelReady = modelAlreadyPatched || modelCandidate !== source;
-
-  if (!gateReady && !hasApiKeyServiceTierGateShape(source)) {
-    warn("Could not identify current service tier auth gate", "API key service tier gate patch");
+  let patched = source;
+  if (
+    source.includes("requirements?.featureRequirements?.fast_mode") ||
+    source.includes("isServiceTierAllowed") ||
+    PATCHED_SERVICE_TIER_GATE.test(source)
+  ) {
+    patched = applyApiKeyServiceTierGatePatch(patched);
+    patched = patched.replace(
+      /async function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{let ([A-Za-z_$][\w$]*)=await ([A-Za-z_$][\w$]*)\(\2,\3\);if\(\4!==`chatgpt`\)return!1;/g,
+      "async function $1($2,$3){let $4=await $5($2,$3);if($4===`apikey`)return!0;if($4!==`chatgpt`)return!1;",
+    );
   }
-  if (!modelReady && !hasApiKeyModelListMappingShape(source)) {
-    warn("Could not identify current model list mapping", "API key model service tier marker patch");
+  if (
+    source.includes("availableModels:") &&
+    source.includes("supportedReasoningEfforts") ||
+    PATCHED_MODEL_MARKER.test(source)
+  ) {
+    patched = applyApiKeyModelMarkerPatch(patched);
   }
-  if (!gateReady || !modelReady) {
-    return source;
-  }
-  if (gateAlreadyPatched) {
-    return modelCandidate;
-  }
-  if (modelAlreadyPatched) {
-    return gateCandidate;
-  }
-  return applyApiKeyModelMarkerPatch(gateCandidate);
+  return patched;
 }
 
 function applyCurrentFallbackFastTierPatch(source) {
@@ -185,7 +182,7 @@ const descriptors = [
     phase: "webview-asset",
     order: 20600,
     ciPolicy: "optional",
-    pattern: /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~k0ede4gb-[^.]+\.js$/,
+    pattern: /^(?:app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz|app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99)-[^.]+\.js$/,
     missingDescription: "current API key service tier gate/model bundle",
     skipDescription: "API key service tier gate/model patch",
     apply: applyCurrentGateAndModelPatch,
@@ -195,7 +192,7 @@ const descriptors = [
     phase: "webview-asset",
     order: 20610,
     ciPolicy: "optional",
-    pattern: /^app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-[^.]+\.js$/,
+    pattern: /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-[^.]+\.js$/,
     missingDescription: "current API key service tier fallback bundle",
     skipDescription: "API key fallback fast tier patch",
     apply: applyCurrentFallbackFastTierPatch,

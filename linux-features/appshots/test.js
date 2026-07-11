@@ -139,17 +139,8 @@ test("appshots availability descriptor matches the current bundle", () => {
   );
 
   assert.equal(descriptor.pattern.test("appshot-availability-BoK-Z77O.js"), false);
-  assert.ok(
-    descriptor.pattern.test(
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-MXsOJYYa.js",
-    ),
-  );
-  assert.equal(
-    descriptor.pattern.test(
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~glxlkd48-Bty5T9_s.js",
-    ),
-    false,
-  );
+  assert.ok(descriptor.pattern.test("app-initial~app-main~page-hSvsQcNf.js"));
+  assert.equal(descriptor.pattern.test("app-initial~app-main~onboarding-page-zcfEkMl-.js"), false);
 });
 
 test("stages the Linux bare modifier monitor helper and Wayland portal hook", () => {

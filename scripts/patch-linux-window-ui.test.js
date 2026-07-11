@@ -156,7 +156,6 @@ const {
   applyLinuxCompletedItemRecoveryPatch,
   applyLinuxRemoteTerminalStatusRecoveryPatch,
   applyLinuxAppServerFeatureEnablementPatch,
-  applyAutomationUpdateEagerToolPatch,
   applyLinuxAppSunsetPatch,
   applyLinuxBrowserUseAvailabilityPatch,
   applyLinuxBrowserUseExternalAvailabilityPatch,
@@ -879,7 +878,6 @@ test("default core patch descriptors are grouped and unique", () => {
     "linux-workspace-root-open-targets",
     "linux-i18n-gate",
     "automation-schedule-multi-time-rrule",
-    "automation-update-eager-tool",
     "linux-app-sunset-gate",
     "linux-app-server-feature-enablement",
     "linux-app-server-backfill-wait",
@@ -4921,17 +4919,6 @@ test("recognizes current settings language row i18n gate as already patched", ()
   assert.deepEqual(warnings, []);
 });
 
-test("keeps automation_update eager in dynamic tools built during thread start", () => {
-  const source =
-    "async function pUt(){return[{type:`namespace`,name:cX,description:`Tools provided by the Codex app.`,tools:[...h?[_ee()]:[],...[],...i?.open_in_codex===!0?[TBt]:[],...h&&d?[SBt]:[],lu,...h&&y?[Ra]:[],...[],...g?AHt({availableHandoffHosts:e,availableModels:b,crossHostHandoffEnabled:n,forkThreadEnabled:!0}):[],...h&&_?[PBt,FBt]:[],...m===`conversational_onboarding`?[yoe]:[],...v&&m!==`conversational_onboarding`?[...vee,bu]:[]].map(e=>({type:`function`,...e,..._Ut.has(e.name)?{}:{deferLoading:!0}}))}]}async sendRequest(e,t,n){if(e===`config/read`)return this.sendConfigReadRequest(t,n);let{request:r,promise:i}=this.createRequest(e,t,n);return i}";
-
-  const patched = applyPatchTwice(applyAutomationUpdateEagerToolPatch, source);
-
-  assert.match(patched, /e\.name===`automation_update`&&delete t\.deferLoading/);
-  assert.match(patched, /\{deferLoading:!0\}/);
-  assert.doesNotMatch(patched, /codex-linux-automation-dynamic-tools-diagnostics/);
-});
-
 test("removes unsupported features from default app-server feature sync", () => {
   const source = [
     "var GF=[`apps`,`auth_elicitation`,`enable_mcp_apps`,`memories`,`mentions_v2`,`plugins`,`remote_control`,`remote_plugin`,`tool_call_mcp_elicitation`,`tool_search`,`tool_suggest`,te];",
@@ -5422,18 +5409,10 @@ test("restarts late-event hydration when a pending queue exists without an in-fl
 });
 
 test("discovers current app-server conversation core Linux webview patches", () => {
-  const legacyConversationAsset =
-    "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~o~bj5tp28r-Dcs9S3fj.js";
-  const legacyLatestConversationAsset =
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~glxlkd48-Bty5T9_s.js";
   const currentConversationAsset =
-    "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js";
+    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js";
   const oldConversationAsset =
-    "app-initial~app-main~hotkey-window-thread-page~thread-app-shell-chrome~header~remote-conver~h59fr3q5-Cm3GYhJA.js";
-  const projectlessRemoteTaskAsset =
-    "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~pull-requests-page~plug~kmtatxxf-DEE2TwPG.js";
-  const latestProjectlessRemoteTaskAsset =
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-MXsOJYYa.js";
+    "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js";
 
   for (const id of ["linux-app-server-conversation-hydration", "linux-completed-item-recovery"]) {
     const descriptor = corePatchDescriptors().find((patch) => patch.id === id);
@@ -5441,16 +5420,36 @@ test("discovers current app-server conversation core Linux webview patches", () 
     assert.ok(descriptor);
     assert.equal(descriptor.phase, "webview-asset");
     assert.equal(descriptor.ciPolicy, "optional");
-    assert.match(String(descriptor.pattern), /b76hmflu/);
+    assert.match(String(descriptor.pattern), /gwqc41kz/);
     assert.equal(descriptor.pattern.test(currentConversationAsset), true);
-    assert.equal(descriptor.pattern.test(legacyConversationAsset), false);
-    assert.equal(descriptor.pattern.test(legacyLatestConversationAsset), false);
     assert.equal(descriptor.pattern.test(oldConversationAsset), false);
-    assert.equal(descriptor.pattern.test(projectlessRemoteTaskAsset), false);
-    assert.equal(descriptor.pattern.test(latestProjectlessRemoteTaskAsset), false);
     assert.equal(descriptor.pattern.test("app-server-manager-signals-test.js"), false);
     assert.equal(descriptor.pattern.test("remote-connections-settings-fixture.js"), false);
   }
+});
+
+test("discovers current font and tooltip core Linux webview patches", () => {
+  const assets = new Map([
+    ["linux-safe-monospace-font-stack", "app-initial~app-main~page-hSvsQcNf.js"],
+    [
+      "linux-tooltip-window-controls-collision",
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
+    ],
+  ]);
+
+  for (const [id, asset] of assets) {
+    const descriptor = corePatchDescriptors().find((patch) => patch.id === id);
+    assert.ok(descriptor);
+    assert.equal(descriptor.pattern.test(asset), true);
+  }
+
+  assert.equal(corePatchDescriptors().some((patch) => patch.id === "automation-update-eager-tool"), false);
+  assert.equal(
+    corePatchDescriptors()
+      .find((patch) => patch.id === "linux-safe-monospace-font-stack")
+      .pattern.test("font-settings-old.js"),
+    false,
+  );
 });
 
 test("recovers completed stream items that arrive after local state lost their started item", () => {

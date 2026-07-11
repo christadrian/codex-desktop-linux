@@ -1,9 +1,11 @@
 "use strict";
 
 const MODEL_PICKER_STATE_ASSET_PATTERN =
-  /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/;
+  /^app-initial~app-main~page-[^.]+\.js$/;
 const MODEL_PICKER_MENU_ASSET_PATTERN =
-  /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~k0ede4gb-[^.]+\.js$/;
+  /^app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99-[^.]+\.js$/;
+const MODEL_PICKER_INLINE_ASSET_PATTERN =
+  /^app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~lpb6mnim-[^.]+\.js$/;
 const SIMPLE_MENU_VIEW_PATTERN =
   /([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\(`composer-model-picker-menu-view-v1`,`simple`\)/;
 const ADVANCED_MENU_VIEW_PATTERN =
@@ -251,7 +253,7 @@ const descriptors = [
     phase: "webview-asset",
     order: 20_796,
     ciPolicy: "optional",
-    pattern: MODEL_PICKER_MENU_ASSET_PATTERN,
+    pattern: MODEL_PICKER_INLINE_ASSET_PATTERN,
     missingDescription: "composer model picker menu bundle",
     skipDescription: "ui-tweaks model picker inline model list patch",
     apply: (source, context = {}) =>
@@ -262,7 +264,7 @@ const descriptors = [
     phase: "webview-asset",
     order: 20_797,
     ciPolicy: "optional",
-    pattern: MODEL_PICKER_MENU_ASSET_PATTERN,
+    pattern: MODEL_PICKER_INLINE_ASSET_PATTERN,
     missingDescription: "composer model picker menu bundle",
     skipDescription: "ui-tweaks dynamic supported reasoning efforts patch",
     apply: (source, context = {}) =>
@@ -281,6 +283,7 @@ module.exports = {
   INLINE_MODEL_LIST_RUNTIME_MARKER,
   MODEL_ALLOWLIST_MARKER,
   MODEL_PICKER_MENU_ASSET_PATTERN,
+  MODEL_PICKER_INLINE_ASSET_PATTERN,
   MODEL_PICKER_STATE_ASSET_PATTERN,
   MODEL_ROW_MARKER,
   MODEL_TITLE_MARKER,

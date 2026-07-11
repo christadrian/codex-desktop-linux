@@ -19,4 +19,5 @@ Run the feature tests with:
 
 ```bash
 node --test linux-features/remote-control-ui/test.js
+node linux-features/remote-control-ui/eval.js
 ```

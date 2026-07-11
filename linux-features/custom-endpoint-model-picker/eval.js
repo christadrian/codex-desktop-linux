@@ -173,58 +173,19 @@ const scenarios = [
     },
   },
   {
-    name: "sidebar provider filter broadened for old direct loader",
+    name: "official and custom endpoints keep the upstream all-provider history filter",
     run() {
       const source = 'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s})}';
-      const patched = applySidebarProviderFilterPatch(source);
-      assert.match(patched, /modelProviders:\[\]/);
-      assert.doesNotMatch(patched, /modelProviders:null/);
+      assert.equal(applySidebarProviderFilterPatch(source), source);
     },
   },
   {
-    name: "state-db-only forced for old direct loader",
+    name: "stale empty-provider history patch is repaired",
     run() {
-      const source = 'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s,useStateDbOnly:n})}';
+      const source = 'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s,useStateDbOnly:n})}';
       const patched = applySidebarProviderFilterPatch(source);
-      assert.match(patched, /listRecentThreads\(\{cursor:e,limit:t,useStateDbOnly:n=!0\}\)/);
-      assert.match(patched, /sourceKinds:s,useStateDbOnly:!0/);
-      assert.match(patched, /modelProviders:\[\]/);
-    },
-  },
-  {
-    name: "current async loader uses local state and filters blank titles",
-    run() {
-      const source = 'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data;if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:null,archived:!1,sourceKinds:oh,useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
-      const patched = applySidebarProviderFilterPatch(source);
-      assert.match(patched, /sourceKinds:\[\]/);
-      assert.match(patched, /useStateDbOnly:!0/);
-      // modelProviders [] restores all-provider history from the local cache.
-      assert.match(patched, /modelProviders:\[\]/);
-    },
-  },
-  {
-    name: "archived history and search keep all providers and source kinds",
-    run() {
-      const source = 'async listAllThreads({modelProviders:e,archived:t=!1}){return i4e({modelProviders:e,archived:t})}async searchThreads({query:e,limit:t=50}){return this.sendRequest(`thread/search`,{query:e,limit:t,modelProviders:null,sourceKinds:p_})}';
-      const patched = applySidebarProviderFilterPatch(source);
-      assert.match(patched, /listAllThreads\(\{modelProviders:\[\],archived:t=!1\}/);
-      assert.match(patched, /modelProviders:\[\],sourceKinds:\[\]/);
-    },
-  },
-  {
-    name: "drift fails visibly",
-    run() {
-      const source = 'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s,extra:1})}';
-      const warnings = [];
-      const originalWarn = console.warn;
-      console.warn = (...args) => warnings.push(args.join(" "));
-      try {
-        assert.equal(applySidebarProviderFilterPatch(source), source);
-      } finally {
-        console.warn = originalWarn;
-      }
-      assert.equal(warnings.length, 1);
-      assert.match(warnings[0], /sidebar provider filter/);
+      assert.match(patched, /modelProviders:null/);
+      assert.doesNotMatch(patched, /modelProviders:\[\]/);
     },
   },
 ];

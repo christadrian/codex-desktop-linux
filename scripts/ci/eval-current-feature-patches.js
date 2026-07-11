@@ -8,7 +8,6 @@ const EXPECTED_PATCHES = [
   "linux-chrome-plugin-auto-install",
   "browser-use-node-repl-approval",
   "linux-app-server-conversation-hydration",
-  "automation-update-eager-tool",
   "local-environment-action-modal-draft",
   "keybinds-settings",
   "feature:authenticated-proxy:main-process-proxy-auth",

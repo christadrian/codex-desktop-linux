@@ -12,6 +12,8 @@ const PATCH_MARKER = "__codexLinuxChatGptBackendSession";
 const CHAT_NAV_MARKER = "__codexLinuxChatGptNavVisible";
 const SITES_AVAILABILITY_MARKER = "__codexLinuxChatGptSitesAvailable";
 const AUTH_BRIDGE_MARKER = "__codexLinuxChatGptSavedAuthToken";
+const CLOUD_ACCESS_MARKER = "__codexLinuxChatGptCloudAccess";
+const SITES_PLUGIN_MARKER = "__codexLinuxChatGptSitesPluginAvailable";
 const SITES_GUARD =
   /(function [A-Za-z_$][\w$]*\(\{accountId:([A-Za-z_$][\w$]*),accountLoading:([A-Za-z_$][\w$]*),additionalRolloutEnabled:([A-Za-z_$][\w$]*),authLoading:([A-Za-z_$][\w$]*),authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,rolloutEnabled:([A-Za-z_$][\w$]*),supportedSurface:([A-Za-z_$][\w$]*)\}\)\{return )/;
 const SITES_AVAILABILITY_GUARD =
@@ -41,20 +43,20 @@ function applyChatGptDualBackendPatch(source) {
   }
 
   let patched = source;
-  const hadEntitlementPatch = patched.includes(`const ${PATCH_MARKER}=`);
+  const hadEntitlementPatch = patched.includes(`globalThis.${PATCH_MARKER}=`);
   if (!hadEntitlementPatch) {
     patched = patched.replace(
       SITES_GUARD,
       (_match, prefix, _accountId, _accountLoading, additionalRolloutEnabled, _authLoading, authMethod, rolloutEnabled, supportedSurface) =>
-        `const ${PATCH_MARKER}=${JSON.stringify(session.accountId)};${prefix}${supportedSurface}&&${authMethod}!==\`chatgpt\`?(!${rolloutEnabled}&&!${additionalRolloutEnabled}?{status:\`denied\`,reason:\`rollout-disabled\`}:{status:\`allowed\`,accountId:${PATCH_MARKER},plan:null}):`,
+        `globalThis.${PATCH_MARKER}=${JSON.stringify(session.accountId)};${prefix}${supportedSurface}&&${authMethod}!==\`chatgpt\`?(!${rolloutEnabled}&&!${additionalRolloutEnabled}?{status:\`denied\`,reason:\`rollout-disabled\`}:{status:\`allowed\`,accountId:globalThis.${PATCH_MARKER},plan:null}):`,
     );
   }
-  const entitlementPatched = patched.includes(`const ${PATCH_MARKER}=`);
+  const entitlementPatched = patched.includes(`globalThis.${PATCH_MARKER}=`);
   const hadAvailabilityPatch = patched.includes(SITES_AVAILABILITY_MARKER);
   if (!hadAvailabilityPatch) {
     patched = patched.replace(
       SITES_AVAILABILITY_GUARD,
-      `$1if(typeof ${PATCH_MARKER}===\`string\`)return\`available\`;/*${SITES_AVAILABILITY_MARKER}*/$3`,
+      `$1if(typeof globalThis.${PATCH_MARKER}===\`string\`)return\`available\`;/*${SITES_AVAILABILITY_MARKER}*/$3`,
     );
   }
 
@@ -86,6 +88,40 @@ function applyChatNavigationPatch(source) {
   return patched;
 }
 
+function applyCloudAccessPatch(source) {
+  if (source.includes(CLOUD_ACCESS_MARKER)) return source;
+  if (chatGptSession() == null) {
+    if (source.includes("codexCloudAccess:")) {
+      console.warn("WARN: No ChatGPT session in ~/.codex/auth.json — skipping Send to cloud patch");
+    }
+    return source;
+  }
+  const needle = /\{access:([A-Za-z_$][\w$]*)\}=([A-Za-z_$][\w$]*)\(\)/g;
+  const patched = source.replace(
+    needle,
+    `{access:$1}={...$2(),access:\`enabled\`}/*${CLOUD_ACCESS_MARKER}*/`,
+  );
+  if (patched === source && source.includes("codexCloudAccess:")) {
+    console.warn("WARN: Could not find Codex Cloud access hook — skipping Send to cloud patch");
+  }
+  return patched;
+}
+
+function applySitesPluginAvailabilityPatch(source) {
+  if (source.includes(SITES_PLUGIN_MARKER)) return source;
+  if (chatGptSession() == null) return source;
+  const needle =
+    /(\{autoInstallOptOutKey:[^,]+,installWhenMissing:!0,name:[^,]+,isAvailable:)\(\{features:([A-Za-z_$][\w$]*)\}\)=>\2\.sites/;
+  const patched = source.replace(
+    needle,
+    `$1({features:$2,platform:__cdlxPlatform})=>__cdlxPlatform===\`linux\`||$2.sites/*${SITES_PLUGIN_MARKER}*/`,
+  );
+  if (patched === source && source.includes("BundledPluginsMarketplace") && source.includes(".sites")) {
+    console.warn("WARN: Could not find Sites bundled plugin availability descriptor — skipping Sites plugin retention patch");
+  }
+  return patched;
+}
+
 function applyChatGptAuthBridgePatch(source) {
   if (source.includes(AUTH_BRIDGE_MARKER)) return source;
   const fsVar = requireName(source, "node:fs") ?? requireName(source, "fs");
@@ -108,7 +144,7 @@ function applyChatGptAuthBridgePatch(source) {
 
   const [, functionName, appServerClient, errorStatus, failureMessage, refreshToken, state] = head;
   const helper = `function ${AUTH_BRIDGE_MARKER}(){try{let e=${fsVar}.readFileSync(${pathVar}.join(process.env.CODEX_HOME||${pathVar}.join(process.env.HOME||${osVar}.homedir(),\`.codex\`),\`auth.json\`),\`utf8\`),t=JSON.parse(e)?.tokens?.access_token;return typeof t===\`string\`&&t.length>0?t:void 0}catch{return void 0}}`;
-  const replacement = `async function ${functionName}({appServerClient:${appServerClient},errorStatus:${errorStatus},failureMessage:${failureMessage},refreshToken:${refreshToken},state:${state}}){if(!${state}.attachAuth)return ${state};if(!${refreshToken}){let __cdlxCachedToken=${appServerClient}.getCachedAuthToken?.();if(typeof __cdlxCachedToken===\`string\`&&__cdlxCachedToken.length>0)return{...${state},tokenSource:\`cached\`,token:__cdlxCachedToken}}try{let __cdlxAuthToken=await ${appServerClient}.getAuthToken({refreshToken:${refreshToken}});if(typeof __cdlxAuthToken!==\`string\`||__cdlxAuthToken.length===0)__cdlxAuthToken=${AUTH_BRIDGE_MARKER}();return{...${state},tokenSource:__cdlxAuthToken===void 0?${refreshToken}?\`refreshed\`:\`loaded\`:\`saved-chatgpt\`,token:__cdlxAuthToken}}catch(__cdlxAuthError){let __cdlxSavedToken=${AUTH_BRIDGE_MARKER}();if(__cdlxSavedToken!==void 0)return{...${state},tokenSource:\`saved-chatgpt\`,token:__cdlxSavedToken};throw new ${errorClass}(${failureMessage},${errorStatus},__cdlxAuthError)}}`;
+  const replacement = `async function ${functionName}({appServerClient:${appServerClient},errorStatus:${errorStatus},failureMessage:${failureMessage},refreshToken:${refreshToken},state:${state}}){if(!${state}.attachAuth)return ${state};let __cdlxSavedToken=${AUTH_BRIDGE_MARKER}();if(__cdlxSavedToken!==void 0)return{...${state},tokenSource:\`saved-chatgpt\`,token:__cdlxSavedToken};if(!${refreshToken}){let __cdlxCachedToken=${appServerClient}.getCachedAuthToken?.();if(typeof __cdlxCachedToken===\`string\`&&__cdlxCachedToken.length>0)return{...${state},tokenSource:\`cached\`,token:__cdlxCachedToken}}try{let __cdlxAuthToken=await ${appServerClient}.getAuthToken({refreshToken:${refreshToken}});return{...${state},tokenSource:${refreshToken}?\`refreshed\`:\`loaded\`,token:__cdlxAuthToken}}catch(__cdlxAuthError){throw new ${errorClass}(${failureMessage},${errorStatus},__cdlxAuthError)}}`;
   const strictLength = source.startsWith('"use strict";') ? '"use strict";'.length : 0;
   const patched = source.slice(0, head.index) + replacement + source.slice(closeBrace + 1);
   return patched.slice(0, strictLength) + helper + patched.slice(strictLength);
@@ -118,6 +154,8 @@ module.exports = {
   applyChatGptAuthBridgePatch,
   applyChatGptDualBackendPatch,
   applyChatNavigationPatch,
+  applyCloudAccessPatch,
+  applySitesPluginAvailabilityPatch,
   chatGptSession,
   descriptors: [
     {
@@ -126,6 +164,23 @@ module.exports = {
       order: 20760,
       ciPolicy: "opt-in",
       apply: applyChatGptAuthBridgePatch,
+    },
+    {
+      id: "sites-plugin-availability",
+      phase: "main-bundle",
+      order: 20761,
+      ciPolicy: "opt-in",
+      apply: applySitesPluginAvailabilityPatch,
+    },
+    {
+      id: "cloud-access",
+      phase: "webview-asset",
+      order: 20765,
+      ciPolicy: "opt-in",
+      pattern: /^local-remote-dropdown-.*\.js$/,
+      missingDescription: "local/remote dropdown webview bundle",
+      skipDescription: "Send to cloud access patch",
+      apply: applyCloudAccessPatch,
     },
     {
       id: "chat-navigation",

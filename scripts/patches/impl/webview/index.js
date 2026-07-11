@@ -588,33 +588,6 @@ function applyLinuxAppServerFeatureEnablementPatch(currentSource) {
   ].join("");
 }
 
-function applyAutomationUpdateEagerToolPatch(currentSource) {
-  const markerPattern =
-    /[A-Za-z_$][\w$]*\.name===`automation_update`&&delete [A-Za-z_$][\w$]*\.deferLoading/u;
-  if (markerPattern.test(currentSource)) {
-    return currentSource;
-  }
-
-  const dynamicToolsPattern =
-    /\.map\(([A-Za-z_$][\w$]*)=>\(\{type:`function`,\.\.\.\1,\.\.\.([A-Za-z_$][\w$]*)\.has\(\1\.name\)\?\{\}:\{deferLoading:!0\}\}\)\)/u;
-  if (!dynamicToolsPattern.test(currentSource)) {
-    if (currentSource.includes("automation_update") && currentSource.includes("deferLoading:!0")) {
-      console.warn(
-        "WARN: Could not find dynamic tools construction point — skipping automation_update eager tool patch",
-      );
-    }
-    return currentSource;
-  }
-
-  return currentSource.replace(
-    dynamicToolsPattern,
-    (_match, toolVar, eagerToolsVar) => {
-      const descriptorVar = toolVar === "t" ? "codexLinuxAutomationDescriptor" : "t";
-      return `.map(${toolVar}=>{let ${descriptorVar}={type:\`function\`,...${toolVar},...${eagerToolsVar}.has(${toolVar}.name)?{}:{deferLoading:!0}};return ${toolVar}.name===\`automation_update\`&&delete ${descriptorVar}.deferLoading,${descriptorVar}})`;
-    },
-  );
-}
-
 function applyLinuxAppServerBackfillWaitPatch(currentSource) {
   const helperSource =
     "function codexLinuxIsStateDbBackfillMessage(e){return typeof e===`string`&&e.toLowerCase().includes(`state db backfill is running`)}" +
@@ -2009,7 +1982,6 @@ module.exports = {
   applyLinuxCompletedItemRecoveryPatch,
   applyLinuxRemoteTerminalStatusRecoveryPatch,
   applyLinuxAppServerFeatureEnablementPatch,
-  applyAutomationUpdateEagerToolPatch,
   applyLinuxChatSearchHydrationPatch,
   applyLinuxBrowserUseAvailabilityPatch,
   applyLinuxBrowserUseExternalAvailabilityPatch,

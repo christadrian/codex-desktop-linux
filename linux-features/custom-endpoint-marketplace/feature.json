@@ -1,0 +1,11 @@
+{
+  "id": "custom-endpoint-marketplace",
+  "title": "Custom Endpoint Marketplace",
+  "description": "Keep official marketplaces (OpenAI Curated, Anthropic) visible when using a custom model provider endpoint (e.g. 9router).",
+  "defaultEnabled": false,
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  },
+  "requires": ["custom-endpoint-model-picker"],
+  "conflicts": []
+}

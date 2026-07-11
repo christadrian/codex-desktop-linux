@@ -50,6 +50,7 @@ Run the feature self-test:
 
 ```bash
 node --test linux-features/appshots/test.js
+node linux-features/appshots/eval.js
 ```
 
 To test in the app, enable the feature, rebuild the dev app, open a chat, open

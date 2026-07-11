@@ -123,6 +123,6 @@ descriptors are marked optional, so a mismatch warns instead of failing the
 build — run the doctor after every upstream update, and re-extract fixtures
 from the new bundle before adjusting needles.
 
-The blank-row filter keys off the current minified `runRecentConversationRefresh`
-shape. If upstream rewrites that method, the test fixture should be updated
-from the new bundle before changing the regex.
+The history cleanup only converts the stale `modelProviders:[]` patch back to
+upstream's `modelProviders:null`. This keeps official and custom endpoint
+threads in the same history after switching endpoints.

@@ -173,12 +173,7 @@ test("remote-control UI descriptors match the current 26.707 app chunks", () => 
 
   assert.ok(
     remoteConnectionsPatch.pattern.test(
-      "app-initial~app-main~hotkey-window-new-thread-page~hotkey-window-home-page~composer-utility-bar-DseH-M7x.js",
-    ),
-  );
-  assert.ok(
-    remoteConnectionsPatch.pattern.test(
-      "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js",
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
     ),
   );
   assert.equal(
@@ -190,12 +185,12 @@ test("remote-control UI descriptors match the current 26.707 app chunks", () => 
 
   assert.ok(
     remoteControlConnectionsPatch.pattern.test(
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-Cdmi2Vi6.js",
+      "app-initial~app-main~appgen-settings-page~plugin-detail-page~new-thread-panel-page~onboardi~lxr449xn-CwhAsMMf.js",
     ),
   );
   assert.equal(
     remoteControlConnectionsPatch.pattern.test(
-      "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js",
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
     ),
     false,
   );
@@ -222,21 +217,14 @@ test("remote-control UI feature patches matching webview assets and records patc
         fs.writeFileSync(
           path.join(
             assetsDir,
-            "app-initial~app-main~hotkey-window-new-thread-page~hotkey-window-home-page~composer-utility-bar-DseH-M7x.js",
-          ),
-          "function s(e){if(e(c,`4114442250`))return`enabled`;return`disabled`}",
-        );
-        fs.writeFileSync(
-          path.join(
-            assetsDir,
-            "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js",
+            "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
           ),
           "function d(){let e=(0,u.c)(3),{data:i}=n(s,r(t)),a=c(`4114442250`);if(i?.config[`features.remote_connections`]===!0)return!0;let o=i?.config.features;if(typeof o!=`object`||!o||Array.isArray(o))return a;let l;return e[0]!==o||e[1]!==a?(l=Object.getOwnPropertyDescriptor(o,`remote_connections`)?.value===!0||a,e[0]=o,e[1]=a,e[2]=l):l=e[2],l}",
         );
         fs.writeFileSync(
           path.join(
             assetsDir,
-            "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-Cdmi2Vi6.js",
+            "app-initial~app-main~appgen-settings-page~plugin-detail-page~new-thread-panel-page~onboardi~lxr449xn-CwhAsMMf.js",
           ),
           "function a({remoteControlConnectionsState:e,slingshotEnabled:t}){return t&&(e?.available??!0)&&e?.accessRequired!==!0}",
         );
@@ -256,7 +244,7 @@ test("remote-control UI feature patches matching webview assets and records patc
           fs.readFileSync(
             path.join(
               assetsDir,
-              "app-initial~app-main~hotkey-window-new-thread-page~hotkey-window-home-page~composer-utility-bar-DseH-M7x.js",
+              "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
             ),
             "utf8",
           ),
@@ -266,17 +254,7 @@ test("remote-control UI feature patches matching webview assets and records patc
           fs.readFileSync(
             path.join(
               assetsDir,
-              "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js",
-            ),
-            "utf8",
-          ),
-          /navigator\.userAgent\.includes\(`Linux`\)/,
-        );
-        assert.match(
-          fs.readFileSync(
-            path.join(
-              assetsDir,
-              "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-Cdmi2Vi6.js",
+              "app-initial~app-main~appgen-settings-page~plugin-detail-page~new-thread-panel-page~onboardi~lxr449xn-CwhAsMMf.js",
             ),
             "utf8",
           ),

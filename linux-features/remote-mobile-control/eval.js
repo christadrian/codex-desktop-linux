@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   applyLinuxRemoteControlChatGptAuthPatch,
   applyLinuxRemoteMobileAppServerRemoteControlPatch,
+  applyLinuxRemoteControlLoadGatePatch,
 } = require("./patch.js");
 const source = "var Wz=[`-c`,`features.code_mode_host=true`,`app-server`,`--analytics-default-enabled`]";
 const patched = applyLinuxRemoteMobileAppServerRemoteControlPatch(source);
@@ -13,4 +14,8 @@ const authSource = "let f=require(`node:fs`),o=require(`node:os`),p=require(`nod
 const authPatched = applyLinuxRemoteControlChatGptAuthPatch(authSource);
 assert.match(authPatched, /codexLinuxRemoteControlSavedChatGptToken/);
 assert.match(authPatched, /prodApiBaseUrl/);
-console.log("4/4 remote-mobile-control eval scenarios passed");
+const loadGatePatched = applyLinuxRemoteControlLoadGatePatch(
+  "function IXt(){return BC(`1042620455`)}",
+);
+assert.match(loadGatePatched, /codexLinuxRemoteControlLoadGateEnabled/);
+console.log("5/5 remote-mobile-control eval scenarios passed");

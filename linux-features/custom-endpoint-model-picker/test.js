@@ -46,15 +46,15 @@ const slashCommandModelFixture =
 const sidebarFixture =
   'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s})}';
 const sidebarPatched =
-  'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s,useStateDbOnly:!0})}';
+  sidebarFixture;
 const sidebarStateDbOnlyFixture =
   'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s,useStateDbOnly:n})}';
 const sidebarStateDbOnlyPatched =
-  'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:[],archived:!1,sourceKinds:s,useStateDbOnly:!0})}';
+  sidebarStateDbOnlyFixture;
 const currentSidebarFixture =
   'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data;if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:null,archived:!1,sourceKinds:oh,useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
 const currentSidebarPatched =
-  'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data.filter(e=>e.name?.trim());if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:[],archived:!1,sourceKinds:[],useStateDbOnly:!0};return this.params.requestClient.sendRequest(`thread/list`,r)}';
+  currentSidebarFixture;
 const currentSidebarAsset =
   'app-initial~app-main~hotkey-window-thread-page~thread-app-shell-chrome~header~remote-conver~h59fr3q5-Cm3GYhJA.js';
 
@@ -522,16 +522,21 @@ test("sidebar provider filter patch applies and is idempotent", () => {
   assert.equal(patched, sidebarPatched);
 });
 
-test("sidebar provider filter patch forces useStateDbOnly", () => {
+test("sidebar history keeps the upstream state DB selection", () => {
   const patched = applyPatchTwice(applySidebarProviderFilterPatch, sidebarStateDbOnlyFixture);
   assert.equal(patched, sidebarStateDbOnlyPatched);
 });
 
-test("sidebar provider filter patch uses local state in async loader", () => {
+test("sidebar history keeps the upstream all-provider filter", () => {
   const patched = applyPatchTwice(applySidebarProviderFilterPatch, currentSidebarFixture);
   assert.equal(patched, currentSidebarPatched);
-  assert.match(patched, /modelProviders:\[\]/);
-  assert.match(patched, /sourceKinds:\[\]/);
+  assert.match(patched, /modelProviders:null/);
+  assert.match(patched, /sourceKinds:oh/);
+});
+
+test("sidebar history repairs the stale empty-provider patch", () => {
+  const stale = currentSidebarFixture.replace("modelProviders:null", "modelProviders:[]");
+  assert.equal(applyPatchTwice(applySidebarProviderFilterPatch, stale), currentSidebarFixture);
 });
 
 test("sidebar provider filter targets the current history bundle", () => {
@@ -580,8 +585,7 @@ test("patches warn and no-op when needle is missing", () => {
     applySidebarProviderFilterPatch(sidebarMissing),
   );
   assert.equal(sidebarValue, sidebarMissing);
-  assert.equal(sidebarWarnings.length, 1);
-  assert.match(sidebarWarnings[0], /sidebar provider filter/);
+  assert.equal(sidebarWarnings.length, 0);
 });
 
 test("patches no-op silently on unrelated source", () => {
