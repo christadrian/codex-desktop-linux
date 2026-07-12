@@ -5,19 +5,17 @@ reaping the older generation, and some helper trees can survive after their
 owning Codex process exits. On Linux this is especially costly when a helper
 owns language servers, build daemons, or desktop sidecars.
 
-This feature is bundle-native. It installs a small Rust reaper plus three
+This feature is bundle-native. It installs a small Rust reaper plus two
 runtime triggers:
 
-- a wrapper around the staged `resources/node_repl` entrypoint;
 - Desktop cold-start/after-exit scan hooks;
 - a Codex `SessionStart` hook merged into `CODEX_HOME/hooks.json`.
 
-When a Codex backend starts a new MCP helper generation, these triggers schedule
-short delayed cleanup passes scoped to each live Codex parent PID. The
-`node_repl` wrapper targets its direct parent; the scan hooks inspect live Codex
-parents independently and also reap configured/app-scoped helper roots that were
-adopted by init or user systemd after their Codex owner exited. Separate Codex
-sessions remain independent.
+The scan hooks inspect live Codex parents and reap configured/app-scoped helper
+roots that were adopted by init or user systemd after their Codex owner exited.
+They do not wrap `node_repl`: multiple Browser Use sessions under one backend
+are valid, so launch-time deduplication can close an active tool transport.
+Separate Codex sessions remain independent.
 
 ## Scope
 
@@ -44,10 +42,9 @@ or providers.
 
 ## Compatibility
 
-This feature can be enabled together with `node-repl-reaper`. When enabled, this
-feature wraps `resources/node_repl` and keeps the original entrypoint at
-`resources/node_repl.codex-linux-original`; `node-repl-reaper` recognizes both
-paths so leaked Browser Use helpers remain in scope.
+This feature can be enabled together with `node-repl-reaper`. Rebuilding from a
+version that wrapped `resources/node_repl` automatically restores the original
+entrypoint before staging the current scan-only feature.
 
 ## Enable
 
@@ -66,7 +63,6 @@ and binaries, and removes this feature's `SessionStart` command marker from
 
 ## Runtime Controls
 
-- `CODEX_MCP_HELPER_REAPER_DISABLE=1` disables the `node_repl` wrapper trigger.
 - `CODEX_MCP_HELPER_REAPER_DISABLE_HOOK=1` skips installing the `SessionStart`
   hook from Desktop runtime hooks.
 - `CODEX_MCP_HELPER_REAPER_DELAY` sets the first delayed pass in seconds
@@ -83,4 +79,5 @@ and binaries, and removes this feature's `SessionStart` command marker from
 ```bash
 rtk cargo test --manifest-path linux-features/mcp-helper-reaper/reaper/Cargo.toml
 node --test linux-features/mcp-helper-reaper/test.js
+node linux-features/mcp-helper-reaper/eval.js
 ```

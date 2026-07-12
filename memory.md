@@ -1,38 +1,32 @@
-# Memory — Upstream Drift and Custom Endpoint ChatGPT Surfaces
+# Memory — Browser Use node_repl Transport Fix
 
-Last updated: 2026-07-11 19:58:36 EAT
+Last updated: 2026-07-12 17:50 EAT
 
 ## What was built
 
-- Repaired current upstream bundle drift across core and enabled Linux feature patches.
-- Extended `linux-features/chatgpt-dual-backend/` so Chat history, Sites, and Send to cloud use the saved ChatGPT session while ordinary Codex traffic stays on the custom endpoint.
-- Fixed Sites cross-chunk state through `globalThis.__codexLinuxChatGptBackendSession`.
-- Promoted `custom-endpoint-marketplace` from ignored local state to a repository feature and fixed its descriptor to patch the current shared plugins hook chunk.
-- Added or refreshed deterministic tests and evals for every repaired feature.
-- Rebuilt `codex-app` successfully.
+- Removed the `mcp-helper-reaper` wrapper around `resources/node_repl`.
+- Kept the feature's cold-start, after-exit, and SessionStart scan hooks.
+- Added upgrade restoration for installs still carrying the legacy wrapper.
+- Added regression tests, an eval, and updated feature documentation.
 
 ## Decisions made
 
-- OpenAI account surfaces use the saved ChatGPT token, never a cached custom-provider token.
-- Custom endpoints continue handling normal Codex task traffic.
-- Marketplace visibility is fixed at the shared plugin hook, not per page.
-- Current upstream shapes only. Old drift fallbacks were removed.
+- `node_repl` launches must not trigger same-parent helper deduplication.
+- Multiple Browser Use sessions under one Codex backend are valid concurrent helpers.
+- Orphan cleanup remains enabled through scan hooks.
 
 ## Problems solved
 
-- Chat history disappeared after switching back to the official endpoint.
-- Sites and Send to cloud were hidden or blocked while a custom endpoint was active.
-- Public, personal, and ChatGPT-connected plugins were hidden because the marketplace patch descriptor missed the current shared Vite chunk.
-- Twenty-three optional patches missed current upstream asset names or needles.
+- Starting another Browser Use helper could reap an active `node_repl`, closing its stdio transport and producing `Transport closed`.
 
 ## Current state
 
-- Portable build: `/home/christadrian/Projects/codex-desktop-setup/codex-app/start.sh`.
-- Sites was verified working by Christadrian.
-- Marketplace patch report: applied.
-- Patch report: zero skipped optional patches, zero failed required patches, zero integrity findings.
-- Marketplace feature tests: 8/8. Marketplace evals: 2/2.
-- Plugin UI still needs Christadrian's final live verification against the rebuilt portable app.
+- Targeted tests: 6/6 passed.
+- Rust reaper tests: 24/24 passed.
+- All Linux feature tests passed.
+- New eval: 3/3 passed.
+- Full feature eval sweep has one unrelated existing failure in `linux-features/agent-workspace/eval.js`.
+- Source fix still needs commit, push, rebuild, install, and live Browser Use verification.
 - Protected untracked directories remain untouched:
   - `.titlebar-package.ItYFs9/`
   - `.upstream-browser-use-validated.l1q46E/`
@@ -40,11 +34,10 @@ Last updated: 2026-07-11 19:58:36 EAT
 ## Next session starts with
 
 1. Run `/remember restore`.
-2. Launch `/home/christadrian/Projects/codex-desktop-setup/codex-app/start.sh`.
-3. Switch to the custom endpoint.
-4. Verify Plugins shows public, personal, and ChatGPT-connected entries.
-5. If verified, install the native package and restart Codex Desktop.
+2. Rebuild/install the package containing the fix.
+3. Restart Codex Desktop.
+4. Run two Browser Use tasks concurrently and verify both `node_repl/js` transports stay alive.
 
 ## Open questions
 
-- Does the rebuilt portable Plugins page now match the official-endpoint inventory?
+- Does live concurrent Browser Use verification remain stable after reinstall?
