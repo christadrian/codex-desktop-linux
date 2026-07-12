@@ -41,3 +41,28 @@ Last updated: 2026-07-12 17:50 EAT
 ## Open questions
 
 - Does live concurrent Browser Use verification remain stable after reinstall?
+
+# Memory — Current Upstream DMG Patch Refresh
+
+Last updated: 2026-07-12
+
+## What changed
+
+- Routed core and optional webview patches to the current consolidated upstream bundle.
+- Refreshed AppShots, open-target, frameless titlebar, remote-control, API-key tier, Copilot effort, and model-picker patch fixtures.
+- Removed the obsolete dynamic reasoning-effort patch because upstream now supplies the current GPT-5.6 effort set.
+- Removed the deleted remote-control NUX descriptor from the current-patch eval.
+
+## Evidence
+
+- Core patch tests: 346/346 passed.
+- Linux feature tests: 531/531 passed.
+- Changed feature evals passed.
+- Current DMG patch probe: 28/28 expected patches passed; only four explicitly disabled Computer Use descriptors skipped.
+- `git diff --check` passed.
+
+## Next session starts with
+
+1. Rebuild and install with `make install-native`.
+2. Restart Codex Desktop.
+3. Verify Browser Use plus enabled optional features against the rebuilt package.

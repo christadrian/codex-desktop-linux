@@ -165,11 +165,6 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
         ["feature:ui-tweaks:model-picker-default-advanced-view", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-include-gpt-5-6", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-inline-model-list", "webview-asset", "optional"],
-        [
-          "feature:ui-tweaks:model-picker-dynamic-supported-reasoning-efforts",
-          "webview-asset",
-          "optional",
-        ],
         ["feature:ui-tweaks:reasoning-effort-labels-english", "webview-asset", "optional"],
       ],
     );
@@ -180,15 +175,15 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
 
 test("model picker descriptors target the current state and menu bundles", () => {
   assert.match(
-    "app-initial~app-main~page-hSvsQcNf.js",
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
     MODEL_PICKER_STATE_ASSET_PATTERN,
   );
   assert.match(
-    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99-CqMu8hJo.js",
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
     MODEL_PICKER_MENU_ASSET_PATTERN,
   );
   assert.match(
-    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~lpb6mnim-BqYcBFmq.js",
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
     MODEL_PICKER_INLINE_ASSET_PATTERN,
   );
   assert.doesNotMatch(
@@ -202,15 +197,14 @@ test("model picker descriptors target the current state and menu bundles", () =>
   const modelPickerDescriptors = require("./patches/model-picker-model-list.js").descriptors;
   const assetByPatch = new Map(modelPickerDescriptors.map(({ id, pattern }) => [id, pattern]));
   assert.match(
-    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99-CqMu8hJo.js",
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
     assetByPatch.get("model-picker-include-gpt-5-6"),
   );
   for (const id of [
     "model-picker-inline-model-list",
-    "model-picker-dynamic-supported-reasoning-efforts",
   ]) {
     assert.match(
-      "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~lpb6mnim-BqYcBFmq.js",
+      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
       assetByPatch.get(id),
     );
   }

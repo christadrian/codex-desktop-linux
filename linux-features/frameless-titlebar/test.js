@@ -66,11 +66,11 @@ test("frameless-titlebar stays disabled until listed in features.json", () => {
       (descriptor) => descriptor.id === "feature:frameless-titlebar:webview-window-controls-layout",
     );
     assert.match(
-      "app-initial~app-main~settings-page~browser-use-settings~computer-use-settings-BLBT7saQ.js",
+      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
       webviewPatch.pattern,
     );
     assert.doesNotMatch(
-      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~duyd76c5-abc.js",
+      "app-initial~app-main~settings-page~browser-use-settings~computer-use-settings-BLBT7saQ.js",
       webviewPatch.pattern,
     );
     assert.doesNotMatch("app-initial~app-main~onboarding-page-abc.js", webviewPatch.pattern);

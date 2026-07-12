@@ -5410,9 +5410,9 @@ test("restarts late-event hydration when a pending queue exists without an in-fl
 
 test("discovers current app-server conversation core Linux webview patches", () => {
   const currentConversationAsset =
-    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js";
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js";
   const oldConversationAsset =
-    "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js";
+    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js";
 
   for (const id of ["linux-app-server-conversation-hydration", "linux-completed-item-recovery"]) {
     const descriptor = corePatchDescriptors().find((patch) => patch.id === id);
@@ -5420,7 +5420,7 @@ test("discovers current app-server conversation core Linux webview patches", () 
     assert.ok(descriptor);
     assert.equal(descriptor.phase, "webview-asset");
     assert.equal(descriptor.ciPolicy, "optional");
-    assert.match(String(descriptor.pattern), /gwqc41kz/);
+    assert.match(String(descriptor.pattern), /iufn7mg3/);
     assert.equal(descriptor.pattern.test(currentConversationAsset), true);
     assert.equal(descriptor.pattern.test(oldConversationAsset), false);
     assert.equal(descriptor.pattern.test("app-server-manager-signals-test.js"), false);
@@ -5433,7 +5433,7 @@ test("discovers current font and tooltip core Linux webview patches", () => {
     ["linux-safe-monospace-font-stack", "app-initial~app-main~page-hSvsQcNf.js"],
     [
       "linux-tooltip-window-controls-collision",
-      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
+      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
     ],
   ]);
 

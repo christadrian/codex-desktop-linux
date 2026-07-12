@@ -7,9 +7,9 @@ const { descriptors } = require("./patch.js");
 const remoteConnections = descriptors.find(({ id }) => id === "remote-connections-visibility");
 const remoteControlConnections = descriptors.find(({ id }) => id === "remote-control-connections-visibility");
 const remoteConnectionsAsset =
-  "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js";
+  "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js";
 const remoteControlConnectionsAsset =
-  "app-initial~app-main~appgen-settings-page~plugin-detail-page~new-thread-panel-page~onboardi~lxr449xn-CwhAsMMf.js";
+  "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js";
 
 assert.ok(remoteConnections.pattern.test(remoteConnectionsAsset));
 assert.ok(remoteControlConnections.pattern.test(remoteControlConnectionsAsset));

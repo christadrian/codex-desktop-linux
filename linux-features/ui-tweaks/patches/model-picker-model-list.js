@@ -1,11 +1,11 @@
 "use strict";
 
 const MODEL_PICKER_STATE_ASSET_PATTERN =
-  /^app-initial~app-main~page-[^.]+\.js$/;
+  /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/;
 const MODEL_PICKER_MENU_ASSET_PATTERN =
-  /^app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99-[^.]+\.js$/;
+  MODEL_PICKER_STATE_ASSET_PATTERN;
 const MODEL_PICKER_INLINE_ASSET_PATTERN =
-  /^app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~lpb6mnim-[^.]+\.js$/;
+  MODEL_PICKER_STATE_ASSET_PATTERN;
 const SIMPLE_MENU_VIEW_PATTERN =
   /([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\(`composer-model-picker-menu-view-v1`,`simple`\)/;
 const ADVANCED_MENU_VIEW_PATTERN =
@@ -258,20 +258,6 @@ const descriptors = [
     skipDescription: "ui-tweaks model picker inline model list patch",
     apply: (source, context = {}) =>
       applyInlineModelListPatch(source, { ...context, warnOnMissingMarkers: true }),
-  },
-  {
-    id: "model-picker-dynamic-supported-reasoning-efforts",
-    phase: "webview-asset",
-    order: 20_797,
-    ciPolicy: "optional",
-    pattern: MODEL_PICKER_INLINE_ASSET_PATTERN,
-    missingDescription: "composer model picker menu bundle",
-    skipDescription: "ui-tweaks dynamic supported reasoning efforts patch",
-    apply: (source, context = {}) =>
-      applyDynamicSupportedReasoningEffortsPatch(source, {
-        ...context,
-        warnOnMissingMarkers: true,
-      }),
   },
 ];
 

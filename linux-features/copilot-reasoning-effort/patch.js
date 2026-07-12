@@ -1,5 +1,8 @@
 "use strict";
 
+const CURRENT_MODEL_ASSET_PATTERN =
+  /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/;
+
 function applyCopilotReasoningEffortSettingsPatch(currentSource) {
   let patchedSource = currentSource;
 
@@ -33,10 +36,17 @@ function applyCopilotReasoningEffortSettingsPatch(currentSource) {
   }
 
   const copilotSavePatchMarker = "copilot-default-reasoning-effort`,";
+  const currentCopilotSaveRegex =
+    /(async\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)=>\{[\s\S]{0,300}?if\(([A-Za-z_$][\w$]*)\)\{await ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),`copilot-default-model`,\2,\{throwOnFailure:!0\}\);)return\}/;
   const copilotAsyncSaveRegex =
     /if\(await ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\)return;if\(([A-Za-z_$][\w$]*)\)\{await ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),`copilot-default-model`,\2,\{throwOnFailure:!0\}\);return\}if\(([A-Za-z_$][\w$]*)\.info\(`Setting default model and reasoning effort`,\{safe:\{newModel:\2,newEffort:\3,profile:([A-Za-z_$][\w$]*)\.profile\}\}\),!([A-Za-z_$][\w$]*)\)(throw Error\(`Model settings host is unavailable`\);|return;)/;
   if (patchedSource.includes(copilotSavePatchMarker)) {
     // Already patched.
+  } else if (currentCopilotSaveRegex.test(patchedSource)) {
+    patchedSource = patchedSource.replace(
+      currentCopilotSaveRegex,
+      "$1await $5($6,`copilot-default-reasoning-effort`,$3,{throwOnFailure:!0});return}",
+    );
   } else if (copilotAsyncSaveRegex.test(patchedSource)) {
     patchedSource = patchedSource.replace(
       copilotAsyncSaveRegex,
@@ -154,7 +164,7 @@ module.exports = {
       id: "settings",
       name: "copilot-reasoning-effort-settings",
       phase: "webview-asset",
-      pattern: /^app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99-[^.]+\.js$/,
+      pattern: CURRENT_MODEL_ASSET_PATTERN,
       missingDescription: "model settings bundle",
       skipDescription: "Copilot reasoning effort settings patch",
       apply: applyCopilotReasoningEffortSettingsPatch,
@@ -163,7 +173,7 @@ module.exports = {
       id: "model-list",
       name: "copilot-reasoning-effort-model-list",
       phase: "webview-asset",
-      pattern: /^app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~ggy53w99-[^.]+\.js$/,
+      pattern: CURRENT_MODEL_ASSET_PATTERN,
       missingDescription: "font settings bundle",
       skipDescription: "Copilot reasoning effort model list patch",
       apply: applyCopilotReasoningEffortModelListPatch,
