@@ -5173,6 +5173,7 @@ launcher_hooks_body = source.split("run_feature_launcher_hooks() {", 1)[1].split
 cold_start_hooks_body = source.split("run_cold_start_hooks() {", 1)[1].split("run_cli_preflight() {", 1)[0]
 after_exit_hooks_body = source.split("run_feature_after_exit_hooks() {", 1)[1].split("run_cli_preflight() {", 1)[0]
 cli_probe_body = source.split("codex_cli_version_probe() {", 1)[1].split("codex_cli_version() {", 1)[0]
+cli_preflight_body = source.split("run_cli_preflight() {", 1)[1].split("run_cli_preflight_background() {", 1)[0]
 notify_body = source.split("notify_error() {", 1)[1].split("canonical_path() {", 1)[0]
 update_manager_body = source.split("run_update_manager() {", 1)[1].split("pid_is_current_user() {", 1)[0]
 stop_body = source.split("stop_owned_webview_server() {", 1)[1].split("owned_webview_server_pid() {", 1)[0]
@@ -5327,7 +5328,7 @@ if 'if needs_cold_start && [ -z "$CODEX_CLI_PATH" ]; then' not in runtime_body:
     raise SystemExit("second-instance handoff must skip missing-CLI failure")
 if '"$HOME/.bun/bin/codex"' not in source:
     raise SystemExit("CLI lookup must include bun global install path")
-if "codex_cli_version_probe()" not in source or "codex_cli_version()" not in source:
+if "codex_cli_version_probe()" not in source or "codex_cli_version()" not in source or "codex_cli_missing_optional_dependency()" not in source:
     raise SystemExit("CLI lookup must log a bounded best-effort resolved CLI version probe")
 if "version unknown; set CODEX_CLI_PATH=/path/to/codex" not in source:
     raise SystemExit("CLI lookup diagnostics must explain explicit CODEX_CLI_PATH pinning")
@@ -5353,6 +5354,10 @@ if 'codex_run_host_command "$hook"' not in after_exit_hooks_body:
     raise SystemExit("launcher after-exit hooks must not inherit packaged LD_LIBRARY_PATH")
 if 'codex_exec_host_command "$@"' not in cli_probe_body:
     raise SystemExit("launcher CLI version probes must not inherit packaged LD_LIBRARY_PATH")
+if 'local require_success="${2:-0}"' not in cli_preflight_body:
+    raise SystemExit("CLI preflight must support a required-success repair mode")
+if not re.search(r'elif codex_cli_missing_optional_dependency "\$CODEX_CLI_PATH"; then\s+if ! run_cli_preflight 0 1; then.*?exit 1.*?cli_preflight_repair_sync', runtime_body, re.S):
+    raise SystemExit("a known broken Linux CLI must be repaired synchronously or abort before Electron launch")
 if 'codex_run_host_command notify-send' not in notify_body:
     raise SystemExit("desktop notifications must not inherit packaged LD_LIBRARY_PATH")
 if 'codex_run_host_command "$CODEX_UPDATE_MANAGER_PATH" "$@"' not in update_manager_body:
@@ -6224,7 +6229,7 @@ functions = [source[
     source.index("codex_restore_original_ld_library_path() {"):
     source.index("# Capture before package-specific launcher patches")
 ]]
-for name in ("find_codex_cli", "pid_parent_matches", "codex_cli_version_probe", "codex_cli_version", "log_codex_cli_path"):
+for name in ("find_codex_cli", "pid_parent_matches", "codex_cli_version_probe", "codex_cli_version", "codex_cli_missing_optional_dependency", "log_codex_cli_path"):
     match = re.search(r"^" + re.escape(name) + r"\(\) \{[\s\S]*?^\}\n", source, re.M)
     if match is None:
         raise SystemExit(f"missing {name}")
@@ -6241,6 +6246,9 @@ case "${1:?}" in
         ;;
     version)
         codex_cli_version "$2"
+        ;;
+    missing-optional)
+        codex_cli_missing_optional_dependency "$2"
         ;;
     log)
         CODEX_CLI_PATH="${2:-}"
@@ -6288,6 +6296,25 @@ PY
     [ "$version_output" = "0.150.0" ] || fail "CLI version probe must read --version output, got $version_output"
     version_output="$(env -i PATH="$HOST_TOOL_PATH" HOME="$fake_home" "$launcher_probe" version "$fallback_version_cli")"
     [ "$version_output" = "0.151.0" ] || fail "CLI version probe must fall back to version output, got $version_output"
+
+    local missing_x64_cli="$workspace/missing-x64-codex"
+    local missing_arm64_cli="$workspace/missing-arm64-codex"
+    local unrelated_failure_cli="$workspace/unrelated-failure-codex"
+    printf '#!/usr/bin/env bash\nprintf "Error: Missing optional dependency@openai/codex-linux-x64. Reinstall Codex.\\n" >&2\nexit 1\n' > "$missing_x64_cli"
+    printf '#!/usr/bin/env bash\nprintf "Missing optional dependency @openai/codex-linux-arm64\\n" >&2\nexit 1\n' > "$missing_arm64_cli"
+    printf '#!/usr/bin/env bash\nprintf "network unavailable\\n" >&2\nexit 1\n' > "$unrelated_failure_cli"
+    chmod +x "$missing_x64_cli" "$missing_arm64_cli" "$unrelated_failure_cli"
+    env -i PATH="$HOST_TOOL_PATH" HOME="$fake_home" TMPDIR="$workspace" "$launcher_probe" missing-optional "$missing_x64_cli" || fail "x64 optional dependency failure must request synchronous repair"
+    env -i PATH="$HOST_TOOL_PATH" HOME="$fake_home" TMPDIR="$workspace" "$launcher_probe" missing-optional "$missing_arm64_cli" || fail "arm64 optional dependency failure must request synchronous repair"
+    if compgen -G "$workspace/codex-cli-output.*" >/dev/null || compgen -G "$workspace/codex-cli-error.*" >/dev/null; then
+        fail "optional dependency probes must remove temporary output files"
+    fi
+    if env -i PATH="$HOST_TOOL_PATH" HOME="$fake_home" TMPDIR="$workspace" "$launcher_probe" missing-optional "$unrelated_failure_cli"; then
+        fail "unrelated CLI failures must not request synchronous npm repair"
+    fi
+    if env -i PATH="$HOST_TOOL_PATH" HOME="$fake_home" "$launcher_probe" missing-optional "$fallback_version_cli"; then
+        fail "working CLI versions must keep the background preflight"
+    fi
 
     # The version probe result is read through command substitution on the
     # launch path. The watchdog subshell (and its sleep child) must not
@@ -6343,6 +6370,9 @@ PY
     if kill -0 "$hanging_pid" 2>/dev/null; then
         kill -9 "$hanging_pid" 2>/dev/null || true
         fail "hanging CLI probe left process $hanging_pid alive"
+    fi
+    if env -i PATH="$HOST_TOOL_PATH" HOME="$fake_home" TMPDIR="$workspace" "$launcher_probe" missing-optional "$hanging_cli"; then
+        fail "timed-out CLI probes must not request synchronous npm repair"
     fi
 
     local hanging_log_cli="$workspace/hanging-log-codex"

@@ -783,11 +783,12 @@ fn read_installed_version(cli_path: &Path) -> Result<String> {
 }
 
 fn missing_platform_optional_dependency(error: &anyhow::Error) -> Option<String> {
-    const ERROR_PREFIX: &str = "Missing optional dependency ";
+    const ERROR_PREFIX: &str = "Missing optional dependency";
     let message = error.to_string();
     let dependency = message
         .split_once(ERROR_PREFIX)?
         .1
+        .trim_start()
         .split_whitespace()
         .next()?
         .trim_end_matches('.');
@@ -2683,7 +2684,7 @@ exit 1
         let prefix = temp.path().join("npm-prefix");
         let fixture = write_npm_cli_install(
             &prefix,
-            "#!/bin/sh\necho 'Missing optional dependency @openai/codex-linux-x64. Reinstall Codex: npm install -g @openai/codex' >&2\nexit 1\n",
+            "#!/bin/sh\necho 'Missing optional dependency@openai/codex-linux-x64. Reinstall Codex: npm install -g @openai/codex' >&2\nexit 1\n",
         )?;
         let repair_log = temp.path().join("npm-repair.log");
         write_executable_script(
@@ -2748,9 +2749,17 @@ exit 1
             missing_platform_optional_dependency(&linux_error).as_deref(),
             Some("@openai/codex-linux-x64")
         );
+        let compact_linux_error = anyhow::anyhow!(
+            "Error: Missing optional dependency@openai/codex-linux-arm64. Reinstall Codex"
+        );
+        assert_eq!(
+            missing_platform_optional_dependency(&compact_linux_error).as_deref(),
+            Some("@openai/codex-linux-arm64")
+        );
         for message in [
             "Codex CLI configuration is invalid",
             "Missing optional dependency @openai/codex-darwin-arm64",
+            "Missing optional dependency@openai/codex-linux-x64-evil",
         ] {
             assert_eq!(
                 missing_platform_optional_dependency(&anyhow::anyhow!(message)),
