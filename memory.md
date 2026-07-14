@@ -66,3 +66,29 @@ Last updated: 2026-07-12
 1. Rebuild and install with `make install-native`.
 2. Restart Codex Desktop.
 3. Verify Browser Use plus enabled optional features against the rebuilt package.
+
+# Memory — ChatGPT Dual Backend Custom Endpoint Fix
+
+Last updated: 2026-07-14
+
+## What changed
+
+- Routed ChatGPT entitlement patching through all current `app-initial~*app-main~*` chunks, including the current Quick Chat shared chunk.
+- Made Sites access deterministic for valid saved ChatGPT sessions instead of relying on cross-chunk global initialization order.
+- Added current-upstream regression tests and eval coverage.
+
+## Evidence
+
+- `node --test linux-features/chatgpt-dual-backend/test.js`: 11/11 passed.
+- `node linux-features/chatgpt-dual-backend/eval.js`: 10/10 passed.
+- Latest extracted upstream gates: 3/3 patched.
+- `git diff --check`: passed.
+
+## Handoff
+
+- Do not build in this session unless explicitly requested.
+- Rebuild/install manually with `./install.sh ./Codex.dmg`.
+- Restart Codex Desktop after install.
+- Protected untracked directories remain untouched:
+  - `.titlebar-package.ItYFs9/`
+  - `.upstream-browser-use-validated.l1q46E/`

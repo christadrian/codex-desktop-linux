@@ -70,6 +70,19 @@ function modelPickerMenuBundleFixture() {
   ].join("");
 }
 
+function currentModelPickerMenuBundleFixture() {
+  return [
+    "function menu(){",
+    "id:`composer.intelligenceDropdown.model.title`;",
+    `const allowed=${MODEL_ALLOWLIST_MARKER};`,
+    "let ce=models;let le=ce,ue;",
+    "id:`composer.intelligenceDropdown.model.rowLabel`;",
+    "id:`composer.intelligenceDropdown.effort.title`;",
+    "let Ce=(0,PU.jsxs)(PU.Fragment,{children:[ve,effort]});",
+    "}",
+  ].join("");
+}
+
 function modelPickerPowerBundleFixture() {
   return [
     "function ARe(e){let t=PRe(FRe,e);if(t.length>=4)return t;let n=PRe(IRe,e);return n.length>=4?n:[]}",
@@ -179,11 +192,11 @@ test("model picker descriptors target the current state and menu bundles", () =>
     MODEL_PICKER_STATE_ASSET_PATTERN,
   );
   assert.match(
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+    "app-initial~app-main~onboarding-page-qmFVRsFx.js",
     MODEL_PICKER_MENU_ASSET_PATTERN,
   );
   assert.match(
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+    "app-initial~app-main~onboarding-page-qmFVRsFx.js",
     MODEL_PICKER_INLINE_ASSET_PATTERN,
   );
   assert.doesNotMatch(
@@ -197,17 +210,25 @@ test("model picker descriptors target the current state and menu bundles", () =>
   const modelPickerDescriptors = require("./patches/model-picker-model-list.js").descriptors;
   const assetByPatch = new Map(modelPickerDescriptors.map(({ id, pattern }) => [id, pattern]));
   assert.match(
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+    "app-initial~app-main~onboarding-page-qmFVRsFx.js",
     assetByPatch.get("model-picker-include-gpt-5-6"),
   );
   for (const id of [
     "model-picker-inline-model-list",
   ]) {
     assert.match(
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+      "app-initial~app-main~onboarding-page-qmFVRsFx.js",
       assetByPatch.get(id),
     );
   }
+});
+
+test("current model picker bundle renders the model list inline", () => {
+  const source = currentModelPickerMenuBundleFixture();
+  const patched = applyInlineModelListPatch(source);
+
+  assert.match(patched, /children:\[le,\/\*codex-linux-inline-model-list\*\//);
+  assert.equal(applyInlineModelListPatch(patched), patched);
 });
 
 test("model picker opens advanced view and renders model choices inline", () => {
@@ -373,11 +394,7 @@ test("English reasoning effort labels can be disabled", () => {
 
 test("sidebar project descriptor targets only the current project sidebar asset", () => {
   assert.match(
-    "app-initial~app-main~projects-index-page~remote-conversation-page-CFT2LLOB.js",
-    PROJECTS_SIDEBAR_ASSET_PATTERN,
-  );
-  assert.doesNotMatch(
-    "app-initial~app-main~page-BF1QkwFT.js",
+    "app-initial~app-main~page-kMhXWEru.js",
     PROJECTS_SIDEBAR_ASSET_PATTERN,
   );
   assert.doesNotMatch(

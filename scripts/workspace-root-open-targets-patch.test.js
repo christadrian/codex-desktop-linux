@@ -113,7 +113,7 @@ test("workspace root dropdown follows aliased File Manager callbacks", () => {
   assert.equal(applyWorkspaceRootOpenTargetsPatch(patched, targets), patched);
 });
 
-test("workspace root open targets patch scans current shared app main project chunks", () => {
+test("workspace root open targets patch scans current app main page chunk", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-workspace-root-open-targets-"));
   try {
     const buildDir = path.join(root, ".vite", "build");
@@ -125,32 +125,29 @@ test("workspace root open targets patch scans current shared app main project ch
       [
         "function codexLinuxIdeCommand(){}",
         "var lM={id:`vscode`};",
-        "var iN={id:`vscodeInsiders`};",
         "var wN={id:`zed`,platforms:{linux:{label:`Zed`}}};",
         "var Hj={id:`terminal`,platforms:{linux:{label:`Terminal`}}};",
       ].join(""),
     );
-    fs.writeFileSync(path.join(assetsDir, "app-main-current.js"), "console.log(`shell`);");
-    const sharedChunkName = "app-initial~app-main~remote-conversation-page~projects-index-page-current.js";
+    const currentChunkName = "app-initial~app-main~page-kMhXWEru.js";
     fs.writeFileSync(
-      path.join(assetsDir, sharedChunkName),
+      path.join(assetsDir, currentChunkName),
       [
         "function CurrentWorkspaceMenu(){",
-        "let _=`/tmp/project`,a=()=>{},x=A(`open-file`),C,w,E;",
-        "C=()=>{if(_==null)return;let e=S(_);Ta({path:_,cwd:e,target:`fileManager`,openFile:x.mutate}),a(!1)};",
-        "w=C;",
-        "E=_==null?null:(0,$.jsx)(di.Item,{LeftIcon:em,onSelect:w,children:(0,$.jsx)(Gh,{platform:m})});",
-        "return (0,$.jsxs)($.Fragment,{children:[E]})",
+        "let g=`/tmp/project`,a=()=>{},b=A(`open-file`),x,S,w;",
+        "x=()=>{if(g==null)return;let e=Ch(g);Ya({path:g,cwd:e,target:`fileManager`,openFile:b.mutate}),a(!1)};",
+        "S=x;",
+        "w=g==null?null:(0,Q.jsx)(ht.Item,{LeftIcon:dR,onSelect:S,children:`File Manager`});",
+        "return w",
         "}",
       ].join(""),
     );
 
     const result = patchWorkspaceRootOpenTargets(root);
-    const patched = fs.readFileSync(path.join(assetsDir, sharedChunkName), "utf8");
+    const patched = fs.readFileSync(path.join(assetsDir, currentChunkName), "utf8");
 
     assert.equal(result.changed, 1);
     assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:vscode/);
-    assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:vscodeInsiders/);
     assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:zed/);
     assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:terminal/);
   } finally {

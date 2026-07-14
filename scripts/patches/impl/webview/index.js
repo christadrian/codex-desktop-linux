@@ -780,6 +780,12 @@ function applyLinuxAppServerConversationHydrationPatch(currentSource) {
       patchedSource.includes("t===`needs_resume`?n?.type===`active`")
     ) {
       // Current upstream already preserves threadRuntimeStatus on summaries.
+    } else if (
+      /source:([A-Za-z_$][\w$]*)\.source,threadRuntimeStatus:\1\.threadRuntimeStatus,turns:/u.test(
+        patchedSource,
+      )
+    ) {
+      // Current upstream conversation summaries preserve threadRuntimeStatus directly.
     } else if (patchedSource.includes("threadRuntimeStatus") && patchedSource.includes("resumeState")) {
       console.warn(
         "WARN: Could not find app-server conversation runtime-status needle — skipping Linux app-server hydration runtime-status patch",

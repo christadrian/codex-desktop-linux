@@ -24,6 +24,8 @@ const cloudFixture =
   "function vr(){let{access:P}=Sn();return P}function va(e){let{access:I}=Fn(),De=hr({cloudAccess:I,hasGitRepository:H,isBrowser:!1});return(0,Q.jsx)(Ji,{codexCloudAccess:I})}";
 const sitesPluginFixture =
   "const n={js:e=>e,Os:`sites`},bs=[{autoInstallOptOutKey:n.js(n.Os),installWhenMissing:!0,name:n.Os,isAvailable:({features:e})=>e.sites}];globalThis.__sites=bs[0].isAvailable;";
+const currentNavigationFixture =
+  "function IL({chatGptProjectCrudStatus:e,desktopNavItemsEnabled:t,quickChatEnabled:n,sidebarMode:r,onCreateChatGptProject:i}){return r===`codex`&&n?(0,KL.jsx)(kF,{}):null}const label={id:`sidebarElectron.quickChatNavLink`};";
 
 test("exports the ChatGPT desktop auth bridge patch", () => {
   assert.equal(typeof feature.applyChatGptAuthBridgePatch, "function");
@@ -100,7 +102,7 @@ test("unlocks ChatGPT Chat and Sites without rerouting custom Codex traffic", ()
     assert.match(patched, /authMethod:i/);
     assert.match(patched, /status:`allowed`,accountId:globalThis\.__codexLinuxChatGptBackendSession,plan:null/);
     assert.match(patched, /__codexLinuxChatGptSitesAvailable/);
-    assert.match(patched, /if\(typeof globalThis\.__codexLinuxChatGptBackendSession===`string`\)return`available`/);
+    assert.match(patched, /if\(!0\)return`available`/);
     assert.doesNotThrow(() => new Function(patched));
     assert.equal(applyChatGptDualBackendPatch(patched), patched);
   });
@@ -117,9 +119,13 @@ test("shows Chat navigation only with a saved ChatGPT session", () => {
     const patched = applyChatNavigationPatch(navigationFixture);
     assert.match(patched, /__codexLinuxChatGptNavVisible/);
     assert.doesNotMatch(patched, /i===`hidden`/);
+    const currentPatched = applyChatNavigationPatch(currentNavigationFixture);
+    assert.match(currentPatched, /r===`codex`\/\*__codexLinuxChatGptNavVisible\*\//);
+    assert.doesNotMatch(currentPatched, /r===`codex`&&n/);
   });
   withAuth({ tokens: { account_id: "acct_1" } }, () => {
     assert.equal(applyChatNavigationPatch(navigationFixture), navigationFixture);
+    assert.equal(applyChatNavigationPatch(currentNavigationFixture), currentNavigationFixture);
   });
 });
 
@@ -138,8 +144,7 @@ test("keeps the Sites bundled plugin eligible with saved ChatGPT auth", () => {
     assert.match(patched, /__codexLinuxChatGptSitesPluginAvailable/);
     assert.equal(applySitesPluginAvailabilityPatch(patched), patched);
     new Function(patched)();
-    assert.equal(globalThis.__sites({ features: { sites: false }, platform: "linux" }), true);
-    assert.equal(globalThis.__sites({ features: { sites: false }, platform: "darwin" }), false);
+    assert.equal(globalThis.__sites({ features: { sites: false } }), true);
     delete globalThis.__sites;
   });
 });
@@ -156,20 +161,25 @@ test("routes Chat and Sites patches to their current upstream assets", () => {
       .filter((descriptor) => descriptor.phase === "webview-asset" && descriptor.pattern?.test(assetName))
       .sort((left, right) => left.order - right.order)
       .reduce((current, descriptor) => descriptor.apply(current), source);
-    const chat = applyForAsset("app-initial~app-main~page-CQfFDtNf.js", navigationFixture);
+    const chat = applyForAsset("app-initial~app-main~page-kMhXWEru.js", currentNavigationFixture);
     const cloud = applyForAsset("local-remote-dropdown-C3bvVXka.js", cloudFixture);
     const sites = applyForAsset(
       "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js",
+      fixture,
+    );
+    const quickChatEntitlement = applyForAsset(
+      "app-initial~artifact-tab-content.electron~app-main~pull-request-code-review~new-thread-pane~hlwvr2wg-y92DUo_J.js",
       fixture,
     );
 
     assert.match(chat, /__codexLinuxChatGptNavVisible/);
     assert.match(cloud, /__codexLinuxChatGptCloudAccess/);
     assert.match(sites, /globalThis\.__codexLinuxChatGptBackendSession="acct_1"/);
+    assert.match(quickChatEntitlement, /status:`allowed`,accountId:globalThis\.__codexLinuxChatGptBackendSession,plan:null/);
   });
 });
 
-test("shares Sites auth across split Vite chunks", () => {
+test("makes Sites available without relying on split Vite chunk execution order", () => {
   withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
     const entitlementChunk = applyChatGptDualBackendPatch(
       fixture.replace(/var Ver,VZ;.*?function F8e/s, "function F8e"),
@@ -178,7 +188,7 @@ test("shares Sites auth across split Vite chunks", () => {
       fixture.slice(0, fixture.indexOf("function F8e")),
     );
     assert.match(entitlementChunk, /globalThis\.__codexLinuxChatGptBackendSession="acct_1"/);
-    assert.match(availabilityChunk, /typeof globalThis\.__codexLinuxChatGptBackendSession/);
-    assert.doesNotMatch(availabilityChunk, /typeof __codexLinuxChatGptBackendSession/);
+    assert.match(availabilityChunk, /if\(!0\)return`available`/);
+    assert.doesNotMatch(availabilityChunk, /typeof globalThis\.__codexLinuxChatGptBackendSession/);
   });
 });

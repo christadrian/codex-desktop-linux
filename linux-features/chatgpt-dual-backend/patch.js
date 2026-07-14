@@ -18,6 +18,8 @@ const SITES_GUARD =
   /(function [A-Za-z_$][\w$]*\(\{accountId:([A-Za-z_$][\w$]*),accountLoading:([A-Za-z_$][\w$]*),additionalRolloutEnabled:([A-Za-z_$][\w$]*),authLoading:([A-Za-z_$][\w$]*),authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,rolloutEnabled:([A-Za-z_$][\w$]*),supportedSurface:([A-Za-z_$][\w$]*)\}\)\{return )/;
 const SITES_AVAILABILITY_GUARD =
   /([A-Za-z_$][\w$]*=[A-Za-z_$][\w$]*\([A-Za-z_$][\w$]*,\(\{get:([A-Za-z_$][\w$]*)\}\)=>\{)(if\(!\2\([A-Za-z_$][\w$]*,`637432221`\)\)return`unavailable`;)/;
+const CURRENT_CHAT_NAV_GUARD =
+  /(function [A-Za-z_$][\w$]*\(\{[^}]*quickChatEnabled:([A-Za-z_$][\w$]*),sidebarMode:([A-Za-z_$][\w$]*)[^}]*\}\)[\s\S]{0,4000}?\3===`codex`)&&\2(\?\(0,[A-Za-z_$][\w$]*\.jsx\)\([A-Za-z_$][\w$]*,\{\}\):null)/;
 
 function chatGptSession() {
   try {
@@ -56,7 +58,7 @@ function applyChatGptDualBackendPatch(source) {
   if (!hadAvailabilityPatch) {
     patched = patched.replace(
       SITES_AVAILABILITY_GUARD,
-      `$1if(typeof globalThis.${PATCH_MARKER}===\`string\`)return\`available\`;/*${SITES_AVAILABILITY_MARKER}*/$3`,
+      `$1if(!0)return\`available\`;/*${SITES_AVAILABILITY_MARKER}*/$3`,
     );
   }
 
@@ -81,7 +83,10 @@ function applyChatNavigationPatch(source) {
   }
   const needle =
     /(,[A-Za-z_$][\w$]*=)!+[A-Za-z_$][\w$]*&&[A-Za-z_$][\w$]*===`hidden`/;
-  const patched = source.replace(needle, `$1!1/*${CHAT_NAV_MARKER}*/`);
+  let patched = source.replace(CURRENT_CHAT_NAV_GUARD, `$1/*${CHAT_NAV_MARKER}*/$4`);
+  if (patched === source) {
+    patched = source.replace(needle, `$1!1/*${CHAT_NAV_MARKER}*/`);
+  }
   if (patched === source && source.includes("sidebarElectron.quickChatNavLink")) {
     console.warn("WARN: Could not find Chat navigation visibility guard — skipping Chat navigation patch");
   }
@@ -114,7 +119,7 @@ function applySitesPluginAvailabilityPatch(source) {
     /(\{autoInstallOptOutKey:[^,]+,installWhenMissing:!0,name:[^,]+,isAvailable:)\(\{features:([A-Za-z_$][\w$]*)\}\)=>\2\.sites/;
   const patched = source.replace(
     needle,
-    `$1({features:$2,platform:__cdlxPlatform})=>__cdlxPlatform===\`linux\`||$2.sites/*${SITES_PLUGIN_MARKER}*/`,
+    `$1()=>!0/*${SITES_PLUGIN_MARKER}*/`,
   );
   if (patched === source && source.includes("BundledPluginsMarketplace") && source.includes(".sites")) {
     console.warn("WARN: Could not find Sites bundled plugin availability descriptor — skipping Sites plugin retention patch");
@@ -197,7 +202,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20800,
       ciPolicy: "opt-in",
-      pattern: /^app-initial~app-main~.*\.js$/,
+      pattern: /^app-initial~.*app-main~.*\.js$/,
       missingDescription: "ChatGPT Chat/Sites webview bundle",
       skipDescription: "ChatGPT Chat/Sites dual-backend entitlement patch",
       apply: applyChatGptDualBackendPatch,

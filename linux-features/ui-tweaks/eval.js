@@ -23,7 +23,7 @@ const unrelated = "console.log('not a project sidebar')";
 assert.match(applySidebarProjectNameStylePatch(current), new RegExp(RUNTIME_MARKER));
 assert.equal(applySidebarProjectNameStylePatch(unrelated), unrelated);
 const menu =
-  `id:\`composer.intelligenceDropdown.model.title\`;const allowed=${MODEL_ALLOWLIST_MARKER};let ue=fragment;let de=ue,fe;id:\`composer.intelligenceDropdown.model.rowLabel\`;id:\`composer.intelligenceDropdown.effort.title\`;let we=(0,c6.jsxs)(c6.Fragment,{children:[ye,effort]});`;
+  `id:\`composer.intelligenceDropdown.model.title\`;const allowed=${MODEL_ALLOWLIST_MARKER};let ce=models;let le=ce,ue;id:\`composer.intelligenceDropdown.model.rowLabel\`;id:\`composer.intelligenceDropdown.effort.title\`;let Ce=(0,PU.jsxs)(PU.Fragment,{children:[ve,effort]});`;
 const power =
   "function ARe(e){let t=PRe(FRe,e);if(t.length>=4)return t;let n=PRe(IRe,e);return n.length>=4?n:[]}function MRe(e){return e?.flatMap(({displayName:e,model:t,supportedReasoningEfforts:n})=>[])}";
 assert.match(applyGpt56AllowlistPatch(menu), new RegExp(GPT_56_ALLOWLIST_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

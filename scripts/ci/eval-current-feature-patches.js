@@ -9,6 +9,7 @@ const EXPECTED_PATCHES = [
   "browser-use-node-repl-approval",
   "linux-app-server-conversation-hydration",
   "linux-completed-item-recovery",
+  "linux-workspace-root-open-targets",
   "linux-tooltip-window-controls-collision",
   "local-environment-action-modal-draft",
   "keybinds-settings",

@@ -83,7 +83,7 @@ test("api-key-service-tier stays disabled until listed in features.json", () => 
   });
 });
 
-test("descriptors are optional and target only the two current app bundles", () => {
+test("descriptors are optional and target the current model and service-tier bundles", () => {
   assert.deepEqual(
     descriptors.map((descriptor) => [descriptor.id, descriptor.phase, descriptor.ciPolicy]),
     [
@@ -99,12 +99,18 @@ test("descriptors are optional and target only the two current app bundles", () 
   );
   assert.equal(
     descriptors[1].pattern.test(
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-CnQKtQ6U.js",
     ),
     true,
   );
   assert.equal(descriptors[0].pattern.test("app-initial~app-main~onboarding-page-abc.js"), false);
   assert.equal(descriptors[1].pattern.test("app-initial~app-main~onboarding-page-abc.js"), false);
+  assert.equal(
+    descriptors[1].pattern.test(
+      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+    ),
+    false,
+  );
 });
 
 test("current target wrappers warn when an exact contract disappears", () => {
@@ -118,7 +124,7 @@ test("current target wrappers warn when an exact contract disappears", () => {
   ]);
 });
 
-test("partial current drift is reported when the other exact target still applies", () => {
+test("split current targets patch independently without cross-bundle drift warnings", () => {
   withFeatureConfig(["api-key-service-tier"], () => {
     const tempApp = fs.mkdtempSync(path.join(os.tmpdir(), "api-key-service-tier-partial-drift-"));
     try {
@@ -134,7 +140,7 @@ test("partial current drift is reported when the other exact target still applie
       fs.writeFileSync(
         path.join(
           assetsDir,
-          "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-current.js",
+          "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-current.js",
         ),
         [
           "let defaultServiceTier=null;",
@@ -154,7 +160,7 @@ test("partial current drift is reported when the other exact target still applie
       );
 
       assert.equal(gateModel?.status, "already-applied");
-      assert.equal(fallback?.status, "applied-with-warnings");
+      assert.equal(fallback?.status, "applied");
     } finally {
       fs.rmSync(tempApp, { recursive: true, force: true });
     }

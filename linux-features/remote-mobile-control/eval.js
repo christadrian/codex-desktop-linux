@@ -5,6 +5,7 @@ const {
   applyLinuxRemoteControlChatGptAuthPatch,
   applyLinuxRemoteMobileAppServerRemoteControlPatch,
   applyLinuxRemoteControlLoadGatePatch,
+  applyLinuxRemoteMobileConversationHydrationPatch,
 } = require("./patch.js");
 const source = "var Wz=[`-c`,`features.code_mode_host=true`,`app-server`,`--analytics-default-enabled`]";
 const patched = applyLinuxRemoteMobileAppServerRemoteControlPatch(source);
@@ -18,4 +19,10 @@ const loadGatePatched = applyLinuxRemoteControlLoadGatePatch(
   "function IXt(){return BC(`1042620455`)}",
 );
 assert.match(loadGatePatched, /codexLinuxRemoteControlLoadGateEnabled/);
-console.log("5/5 remote-mobile-control eval scenarios passed");
+const latestRuntimeStatusSource =
+  "function a(e){return{threadRuntimeStatus:e.threadRuntimeStatus,resumeState:`needs_resume`}}function b(e){let{resumeState:t,threadRuntimeStatus:n}=e;return t===`needs_resume`?n?.type===`active`:!1}";
+assert.equal(
+  applyLinuxRemoteMobileConversationHydrationPatch(latestRuntimeStatusSource),
+  latestRuntimeStatusSource,
+);
+console.log("6/6 remote-mobile-control eval scenarios passed");

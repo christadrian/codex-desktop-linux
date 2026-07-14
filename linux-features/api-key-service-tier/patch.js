@@ -3,6 +3,8 @@
 const JS_IDENT = "[A-Za-z_$][\\w$]*";
 const CURRENT_MODEL_ASSET_PATTERN =
   /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/;
+const CURRENT_SERVICE_TIER_ASSET_PATTERN =
+  /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-[^.]+\.js$/;
 const PATCH_MARKER = "codexLinuxApiKeyFastTier";
 const MODEL_MARKER = "codexLinuxApiKeyServiceTierModel";
 const SERVICE_TIER_GATE_SHAPE = new RegExp(
@@ -194,7 +196,7 @@ const descriptors = [
     phase: "webview-asset",
     order: 20610,
     ciPolicy: "optional",
-    pattern: CURRENT_MODEL_ASSET_PATTERN,
+    pattern: CURRENT_SERVICE_TIER_ASSET_PATTERN,
     missingDescription: "current API key service tier fallback bundle",
     skipDescription: "API key fallback fast tier patch",
     apply: applyCurrentFallbackFastTierPatch,

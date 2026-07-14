@@ -5410,7 +5410,7 @@ test("restarts late-event hydration when a pending queue exists without an in-fl
 
 test("discovers current app-server conversation core Linux webview patches", () => {
   const currentConversationAsset =
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js";
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-BWgIh_w6.js";
   const oldConversationAsset =
     "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js";
 
@@ -5426,6 +5426,22 @@ test("discovers current app-server conversation core Linux webview patches", () 
     assert.equal(descriptor.pattern.test("app-server-manager-signals-test.js"), false);
     assert.equal(descriptor.pattern.test("remote-connections-settings-fixture.js"), false);
   }
+});
+
+test("accepts current conversation summaries that preserve runtime status directly", () => {
+  const source = [
+    "function Zz(e){let i=[];for(let a=0;a<e.memberships.length;a+=1){",
+    "let s=e.childConversations[a]??null,c=s==null?null:{source:s.source,threadRuntimeStatus:s.threadRuntimeStatus,turns:ac(s)};",
+    "i.push(c)}}",
+    "function oH({conversationId:e,resumeState:t,turnCount:n}){return e==null?`not-thread`:n==null||t!==`resumed`?`pending`:n===0?`empty`:`has-turns`}",
+  ].join("");
+
+  const { value: patched, warnings } = captureWarns(() =>
+    applyPatchTwice(applyLinuxAppServerConversationHydrationPatch, source),
+  );
+
+  assert.equal(patched, source);
+  assert.deepEqual(warnings, []);
 });
 
 test("discovers current font and tooltip core Linux webview patches", () => {

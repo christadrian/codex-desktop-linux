@@ -59,6 +59,7 @@ test("frameless-titlebar stays disabled until listed in features.json", () => {
       descriptors.map((descriptor) => descriptor.id).sort(),
       [
         "feature:frameless-titlebar:main-process",
+        "feature:frameless-titlebar:webview-window-controls-chrome",
         "feature:frameless-titlebar:webview-window-controls-layout",
       ],
     );
@@ -66,7 +67,7 @@ test("frameless-titlebar stays disabled until listed in features.json", () => {
       (descriptor) => descriptor.id === "feature:frameless-titlebar:webview-window-controls-layout",
     );
     assert.match(
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+      "app-initial~artifact-tab-content.electron~app-main~appgen-settings-page~page~pull-request-r~napudbu0-BLPFEZVT.js",
       webviewPatch.pattern,
     );
     assert.doesNotMatch(
@@ -77,6 +78,13 @@ test("frameless-titlebar stays disabled until listed in features.json", () => {
     assert.doesNotMatch("use-window-controls-safe-area-abc.js", webviewPatch.pattern);
     assert.doesNotMatch("app-initial~app-main~onboarding-page~debug-window-page-abc.js", webviewPatch.pattern);
     assert.doesNotMatch("app-main-abc.js", webviewPatch.pattern);
+    const chromePatch = descriptors.find(
+      (descriptor) => descriptor.id === "feature:frameless-titlebar:webview-window-controls-chrome",
+    );
+    assert.match(
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-CnQKtQ6U.js",
+      chromePatch.pattern,
+    );
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

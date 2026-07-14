@@ -55,7 +55,7 @@ const REMOTE_MOBILE_APP_SERVER_REMOTE_CONTROL_MARKER = "codexLinuxRemoteMobileAp
 const REMOTE_MOBILE_APP_SERVER_ARGS_NEEDLE =
   "[`-c`,`features.code_mode_host=true`,`app-server`,`--analytics-default-enabled`]";
 const REMOTE_MOBILE_CONVERSATION_ASSET_PATTERN =
-  /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/u;
+  /^app-initial~app-main~(?:new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3|onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz)-[^.]+\.js$/u;
 const REMOTE_CONTROL_SELECTED_TAB_NEEDLE =
   "function rr({selectedConnectionsTab:e,showControlThisMacTab:t,showRemoteControlConnectionsSection:n,showTabbedSshPage:r}){return n?e===`control-this-mac`&&!t||e===`ssh`&&!r?`access-other-devices`:e:`ssh`}";
 const REMOTE_CONTROL_SELECTED_TAB_REPLACEMENT =
@@ -1317,11 +1317,15 @@ function applyLinuxRemoteMobileConversationHydrationPatch(source) {
       patched = patched.replace(runtimeNeedle, runtimeReplacement);
     } else if (
       patched.includes("threadRuntimeStatus:e.threadRuntimeStatus") &&
-      patched.includes("t===`needs_resume`?n?.type===`active`")
+      (patched.includes("t===`needs_resume`?n?.type===`active`") ||
+        /return [A-Za-z_$][\w$]*===`needs_resume`\?[A-Za-z_$][\w$]*\?\.type===`active`:/.test(patched))
     ) {
       // Current upstream preserves threadRuntimeStatus on thread summaries and
       // already treats active needs-resume threads as live in the sidebar model.
-    } else if (patched.includes("threadRuntimeStatus") && patched.includes("resumeState")) {
+    } else if (
+      patched.includes("threadRuntimeStatus:e.threadRuntimeStatus") &&
+      patched.includes("resumeState")
+    ) {
       console.warn("WARN: Could not find thread/list runtime-status needle - skipping remote mobile runtime-status patch");
     }
   }
