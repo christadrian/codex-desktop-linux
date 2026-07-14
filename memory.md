@@ -1,94 +1,57 @@
-# Memory — Browser Use node_repl Transport Fix
+# Memory — Main Sync and Current DMG Patch Refresh
 
-Last updated: 2026-07-12 17:50 EAT
+Last updated: 2026-07-14 EAT
 
 ## What was built
 
-- Removed the `mcp-helper-reaper` wrapper around `resources/node_repl`.
-- Kept the feature's cold-start, after-exit, and SessionStart scan hooks.
-- Added upgrade restoration for installs still carrying the legacy wrapper.
-- Added regression tests, an eval, and updated feature documentation.
+- Merged the current `main` branch into `work` without rebasing, retaining all existing work-branch commits.
+- Refreshed current-upstream patch targeting for:
+  - `linux-features/pet-overlay/`
+  - `linux-features/remote-control-ui/`
+  - `linux-features/api-key-service-tier/`
+  - `linux-features/conversation-mode/`
+  - `linux-features/copilot-reasoning-effort/`
+  - `linux-features/project-task-sort/`
+  - `scripts/patches/core/all-linux/extracted-app/workspace-root-open-targets/`
+- Added or refreshed regression tests, eval suites, and README validation commands for the affected optional features.
+- Committed and pushed the completed merge to `origin/work`:
+  - `a15eba8 Merge main updates and refresh current DMG patches`
 
 ## Decisions made
 
-- `node_repl` launches must not trigger same-parent helper deduplication.
-- Multiple Browser Use sessions under one Codex backend are valid concurrent helpers.
-- Orphan cleanup remains enabled through scan hooks.
+- Upstream patch drift targets only the latest supported `Codex.dmg`; no legacy bundle fallbacks were retained.
+- The `work` branch was updated through a normal merge, never a rebase.
+- Optional feature patches remain fail-soft and idempotent.
+- Protected local directories remain untracked and untouched:
+  - `.titlebar-package.ItYFs9/`
+  - `.upstream-browser-use-validated.l1q46E/`
 
 ## Problems solved
 
-- Starting another Browser Use helper could reap an active `node_repl`, closing its stdio transport and producing `Transport closed`.
+- Fixed nine optional-patch warnings caused by current upstream bundle and minified-method drift.
+- Updated Pet Overlay Niri drag completion wrapping to preserve the current docking tail.
+- Updated webview bundle selectors for remote connections, API-key service tiers, dictation, Copilot reasoning effort, project task creation sorting, and workspace-root File Manager actions.
 
 ## Current state
 
-- Targeted tests: 6/6 passed.
-- Rust reaper tests: 24/24 passed.
-- All Linux feature tests passed.
-- New eval: 3/3 passed.
-- Full feature eval sweep has one unrelated existing failure in `linux-features/agent-workspace/eval.js`.
-- Source fix still needs commit, push, rebuild, install, and live Browser Use verification.
-- Protected untracked directories remain untouched:
-  - `.titlebar-package.ItYFs9/`
-  - `.upstream-browser-use-validated.l1q46E/`
+- `work` and `origin/work` point to commit `a15eba8`.
+- User confirmed the build and runtime behavior work.
+- Patcher tests: 368/368 passed.
+- Linux feature tests: 616/616 passed.
+- Targeted warning regression tests: 154/154 passed.
+- Feature eval suites: 18 passed.
+- Script smoke tests passed.
+- Updater tests: 242/242 passed.
+- Cargo check, shell syntax checks, and `git diff --check` passed.
+- No tracked changes remain after the pushed commit.
+- No service restart is pending.
 
 ## Next session starts with
 
 1. Run `/remember restore`.
-2. Rebuild/install the package containing the fix.
-3. Restart Codex Desktop.
-4. Run two Browser Use tasks concurrently and verify both `node_repl/js` transports stay alive.
+2. Confirm `work` still matches `origin/work`.
+3. Continue from commit `a15eba8`.
 
 ## Open questions
 
-- Does live concurrent Browser Use verification remain stable after reinstall?
-
-# Memory — Current Upstream DMG Patch Refresh
-
-Last updated: 2026-07-12
-
-## What changed
-
-- Routed core and optional webview patches to the current consolidated upstream bundle.
-- Refreshed AppShots, open-target, frameless titlebar, remote-control, API-key tier, Copilot effort, and model-picker patch fixtures.
-- Removed the obsolete dynamic reasoning-effort patch because upstream now supplies the current GPT-5.6 effort set.
-- Removed the deleted remote-control NUX descriptor from the current-patch eval.
-
-## Evidence
-
-- Core patch tests: 346/346 passed.
-- Linux feature tests: 531/531 passed.
-- Changed feature evals passed.
-- Current DMG patch probe: 28/28 expected patches passed; only four explicitly disabled Computer Use descriptors skipped.
-- `git diff --check` passed.
-
-## Next session starts with
-
-1. Rebuild and install with `make install-native`.
-2. Restart Codex Desktop.
-3. Verify Browser Use plus enabled optional features against the rebuilt package.
-
-# Memory — ChatGPT Dual Backend Custom Endpoint Fix
-
-Last updated: 2026-07-14
-
-## What changed
-
-- Routed ChatGPT entitlement patching through all current `app-initial~*app-main~*` chunks, including the current Quick Chat shared chunk.
-- Made Sites access deterministic for valid saved ChatGPT sessions instead of relying on cross-chunk global initialization order.
-- Added current-upstream regression tests and eval coverage.
-
-## Evidence
-
-- `node --test linux-features/chatgpt-dual-backend/test.js`: 11/11 passed.
-- `node linux-features/chatgpt-dual-backend/eval.js`: 10/10 passed.
-- Latest extracted upstream gates: 3/3 patched.
-- `git diff --check`: passed.
-
-## Handoff
-
-- Do not build in this session unless explicitly requested.
-- Rebuild/install manually with `./install.sh ./Codex.dmg`.
-- Restart Codex Desktop after install.
-- Protected untracked directories remain untouched:
-  - `.titlebar-package.ItYFs9/`
-  - `.upstream-browser-use-validated.l1q46E/`
+- None.
