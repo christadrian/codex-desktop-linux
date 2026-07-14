@@ -62,4 +62,5 @@ ignores unknown fields may show the UI without changing latency.
 
 ```bash
 node --test linux-features/api-key-service-tier/test.js
+node linux-features/api-key-service-tier/eval.js
 ```

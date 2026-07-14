@@ -17,8 +17,8 @@ const {
   GPT_56_ALLOWLIST_MARKER,
   INLINE_MODEL_LIST_RUNTIME_MARKER,
   MODEL_ALLOWLIST_MARKER,
+  MODEL_PICKER_ALLOWLIST_ASSET_PATTERN,
   MODEL_PICKER_MENU_ASSET_PATTERN,
-  MODEL_PICKER_INLINE_ASSET_PATTERN,
   MODEL_PICKER_STATE_ASSET_PATTERN,
   SIMPLE_MENU_VIEW_PATTERN,
   applyDefaultAdvancedViewPatch,
@@ -70,25 +70,13 @@ function modelPickerMenuBundleFixture() {
   ].join("");
 }
 
-function currentModelPickerMenuBundleFixture() {
-  return [
-    "function menu(){",
-    "id:`composer.intelligenceDropdown.model.title`;",
-    `const allowed=${MODEL_ALLOWLIST_MARKER};`,
-    "let ce=models;let le=ce,ue;",
-    "id:`composer.intelligenceDropdown.model.rowLabel`;",
-    "id:`composer.intelligenceDropdown.effort.title`;",
-    "let Ce=(0,PU.jsxs)(PU.Fragment,{children:[ve,effort]});",
-    "}",
-  ].join("");
-}
-
 function modelPickerPowerBundleFixture() {
   return [
-    "function ARe(e){let t=PRe(FRe,e);if(t.length>=4)return t;let n=PRe(IRe,e);return n.length>=4?n:[]}",
+    "function ARe(e,t=!1){let n=PRe(t?[...FRe,URe]:FRe,e);if(n.length>=4)return n;let r=PRe(IRe,e);return r.length>=4?r:[]}",
     "function MRe(e){return e?.flatMap(({displayName:e,model:t,supportedReasoningEfforts:n})=>{let r=e==null?`Custom`:e,i=n.flatMap(({reasoningEffort:e})=>[e]);return(i.length>0?i:[`medium`]).map(e=>({id:`${t}:${e}`,model:t,modelLabel:r,reasoningEffort:e}))})??[]}",
     "function PRe(e,t){return e.flatMap((e,n)=>t?.some(t=>t.model===e.model&&t.supportedReasoningEfforts.some(({reasoningEffort:t})=>t===e.reasoningEffort))?[{...e,powerSettingIndex:n}]:[])}",
-    "var FRe=[{id:`gpt-5.6-terra:low`,model:`gpt-5.6-terra`,modelLabel:`5.6 Terra`,reasoningEffort:`low`},{id:`gpt-5.6-sol:low`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`low`},{id:`gpt-5.6-sol:medium`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`medium`},{id:`gpt-5.6-sol:high`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`high`},{id:`gpt-5.6-sol:xhigh`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`xhigh`},{id:`gpt-5.6-sol:ultra`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`ultra`}];",
+    "var FRe=[{id:`gpt-5.6-terra:low`,model:`gpt-5.6-terra`,modelLabel:`5.6 Terra`,reasoningEffort:`low`},{id:`gpt-5.6-sol:low`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`low`},{id:`gpt-5.6-sol:medium`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`medium`},{id:`gpt-5.6-sol:high`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`high`},{id:`gpt-5.6-sol:xhigh`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`xhigh`}];",
+    "var URe={id:`gpt-5.6-sol:ultra`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`ultra`};",
     "var IRe=[{id:`gpt-5.6-terra:low`,model:`gpt-5.6-terra`,modelLabel:`5.6 Terra`,reasoningEffort:`low`},{id:`gpt-5.6-terra:medium`,model:`gpt-5.6-terra`,modelLabel:`5.6 Terra`,reasoningEffort:`medium`},{id:`gpt-5.6-terra:high`,model:`gpt-5.6-terra`,modelLabel:`5.6 Terra`,reasoningEffort:`high`},{id:`gpt-5.6-terra:xhigh`,model:`gpt-5.6-terra`,modelLabel:`5.6 Terra`,reasoningEffort:`xhigh`}];",
   ].join("");
 }
@@ -178,6 +166,11 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
         ["feature:ui-tweaks:model-picker-default-advanced-view", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-include-gpt-5-6", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-inline-model-list", "webview-asset", "optional"],
+        [
+          "feature:ui-tweaks:model-picker-dynamic-supported-reasoning-efforts",
+          "webview-asset",
+          "optional",
+        ],
         ["feature:ui-tweaks:reasoning-effort-labels-english", "webview-asset", "optional"],
       ],
     );
@@ -187,48 +180,43 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
 });
 
 test("model picker descriptors target the current state and menu bundles", () => {
-  assert.match(
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-k1satKyX.js",
+  const stateAsset =
+    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-DRU9Ekz0.js";
+  const allowlistAsset =
+    "app-initial~app-main~onboarding-page-qmFVRsFx.js";
+  const menuAsset = allowlistAsset;
+
+  assert.match(stateAsset, MODEL_PICKER_STATE_ASSET_PATTERN);
+  assert.match(allowlistAsset, MODEL_PICKER_ALLOWLIST_ASSET_PATTERN);
+  assert.match(menuAsset, MODEL_PICKER_MENU_ASSET_PATTERN);
+
+  assert.doesNotMatch(stateAsset, MODEL_PICKER_ALLOWLIST_ASSET_PATTERN);
+  assert.doesNotMatch(stateAsset, MODEL_PICKER_MENU_ASSET_PATTERN);
+  assert.doesNotMatch(allowlistAsset, MODEL_PICKER_STATE_ASSET_PATTERN);
+  assert.doesNotMatch(menuAsset, MODEL_PICKER_STATE_ASSET_PATTERN);
+
+  // The previous DMG split these patches across different chunks.
+  // Current-DMG-only targeting must not retain those chunks as fallbacks.
+  assert.doesNotMatch(
+    "app-initial~app-main~page-CMpPiY3-.js",
     MODEL_PICKER_STATE_ASSET_PATTERN,
   );
-  assert.match(
-    "app-initial~app-main~onboarding-page-qmFVRsFx.js",
-    MODEL_PICKER_MENU_ASSET_PATTERN,
-  );
-  assert.match(
-    "app-initial~app-main~onboarding-page-qmFVRsFx.js",
-    MODEL_PICKER_INLINE_ASSET_PATTERN,
+  assert.doesNotMatch(
+    "app-initial~app-main~new-thread-panel-page~onboarding-page~login-route~appgen-library-page~~gpgl9un5-_t04Xpau.js",
+    MODEL_PICKER_ALLOWLIST_ASSET_PATTERN,
   );
   assert.doesNotMatch(
-    "app-initial~app-main~onboarding-page-BF1QkwFT.js",
-    MODEL_PICKER_STATE_ASSET_PATTERN,
-  );
-  assert.doesNotMatch(
-    "app-initial~app-main~page-BF1QkwFT.js",
+    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~lpb6mnim-Bawo32lF.js",
     MODEL_PICKER_MENU_ASSET_PATTERN,
   );
-  const modelPickerDescriptors = require("./patches/model-picker-model-list.js").descriptors;
-  const assetByPatch = new Map(modelPickerDescriptors.map(({ id, pattern }) => [id, pattern]));
-  assert.match(
-    "app-initial~app-main~onboarding-page-qmFVRsFx.js",
-    assetByPatch.get("model-picker-include-gpt-5-6"),
+  assert.doesNotMatch(
+    "app-initial~app-main~hotkey-window-thread-page~keyboard-shortcuts-settings~thread-app-shell~cf704xib-BpnUyB2R.js",
+    MODEL_PICKER_ALLOWLIST_ASSET_PATTERN,
   );
-  for (const id of [
-    "model-picker-inline-model-list",
-  ]) {
-    assert.match(
-      "app-initial~app-main~onboarding-page-qmFVRsFx.js",
-      assetByPatch.get(id),
-    );
-  }
-});
-
-test("current model picker bundle renders the model list inline", () => {
-  const source = currentModelPickerMenuBundleFixture();
-  const patched = applyInlineModelListPatch(source);
-
-  assert.match(patched, /children:\[le,\/\*codex-linux-inline-model-list\*\//);
-  assert.equal(applyInlineModelListPatch(patched), patched);
+  assert.doesNotMatch(
+    "app-initial~app-main~onboarding-page~projects-index-page~hotkey-window-thread-page~quick-ch~iiv1g666-EGSyoZAU.js",
+    MODEL_PICKER_MENU_ASSET_PATTERN,
+  );
 });
 
 test("model picker opens advanced view and renders model choices inline", () => {
@@ -309,6 +297,20 @@ test("GPT-5.6 Power slider follows reasoning efforts enabled in settings", () =>
       "gpt-5.6-sol:medium",
       "gpt-5.6-sol:high",
       "gpt-5.6-sol:xhigh",
+    ],
+  );
+  assert.deepEqual(
+    resolvePowerSelections(
+      filteredGpt56Models(["low", "medium", "high", "xhigh", "ultra"]),
+      true,
+    ).map(({ id }) => id),
+    [
+      "gpt-5.6-terra:low",
+      "gpt-5.6-sol:low",
+      "gpt-5.6-sol:medium",
+      "gpt-5.6-sol:high",
+      "gpt-5.6-sol:xhigh",
+      "gpt-5.6-sol:ultra",
     ],
   );
 });
@@ -395,6 +397,10 @@ test("English reasoning effort labels can be disabled", () => {
 test("sidebar project descriptor targets only the current project sidebar asset", () => {
   assert.match(
     "app-initial~app-main~page-kMhXWEru.js",
+    PROJECTS_SIDEBAR_ASSET_PATTERN,
+  );
+  assert.doesNotMatch(
+    "app-initial~app-main~projects-index-page~remote-conversation-page-CFT2LLOB.js",
     PROJECTS_SIDEBAR_ASSET_PATTERN,
   );
   assert.doesNotMatch(

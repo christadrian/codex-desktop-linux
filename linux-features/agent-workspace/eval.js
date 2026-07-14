@@ -12,7 +12,7 @@ const current =
 
 const patched = applyAgentWorkspaceSettingsIndexPatch(current);
 assert.match(patched, new RegExp(SETTINGS_ASSET));
-assert.match(patched, /\.AgentWorkspacesSettings/);
+assert.match(patched, /\)\.default\),"general-settings":/);
 assert.throws(
   () => applyAgentWorkspaceSettingsIndexPatch('var routes={"general-settings":drifted}'),
   /could not add agent workspace settings route/,

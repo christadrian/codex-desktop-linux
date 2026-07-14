@@ -9,7 +9,7 @@ assert(
   ),
 );
 assert(
-  descriptors.find(({ id }) => id === "webview-window-controls-chrome").pattern.test(
+  descriptor.pattern.test(
     "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-CnQKtQ6U.js",
   ),
 );
@@ -17,4 +17,4 @@ const source = "case`quickChat`:case`primary`:return n===`darwin`?{titleBarStyle
 const patched = applyFramelessTitlebarMainPatch(source);
 assert.match(patched, /n===`linux`\?\{titleBarStyle:`hidden`/);
 assert.doesNotMatch(patched, /n===`win32`\|\|n===`linux`/);
-console.log("4/4 frameless-titlebar eval scenarios passed");
+console.log("3/3 frameless-titlebar eval scenarios passed");

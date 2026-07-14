@@ -1,10 +1,6 @@
 "use strict";
 
 const JS_IDENT = "[A-Za-z_$][\\w$]*";
-const CURRENT_MODEL_ASSET_PATTERN =
-  /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/;
-const CURRENT_SERVICE_TIER_ASSET_PATTERN =
-  /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-[^.]+\.js$/;
 const PATCH_MARKER = "codexLinuxApiKeyFastTier";
 const MODEL_MARKER = "codexLinuxApiKeyServiceTierModel";
 const SERVICE_TIER_GATE_SHAPE = new RegExp(
@@ -30,11 +26,6 @@ function warn(message, patchName) {
 }
 
 function applyApiKeyServiceTierGatePatch(source) {
-  source = source.replace(
-    /async function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{let ([A-Za-z_$][\w$]*)=await ([A-Za-z_$][\w$]*)\(\2,\3\);return \4===`chatgpt`\?\(await ([A-Za-z_$][\w$]*)\.query\.fetch\(([A-Za-z_$][\w$]*),\{authMethod:\4,hostId:\3\}\)\)\.requirements\?\.featureRequirements\?\.fast_mode!==!1:!1\}/g,
-    "async function $1($2,$3){let $4=await $5($2,$3);return $4===`apikey`?!0:$4===`chatgpt`?(await $6.query.fetch($7,{authMethod:$4,hostId:$3})).requirements?.featureRequirements?.fast_mode!==!1:!1}",
-  );
-
   const gateNeedle = new RegExp(
     `(${JS_IDENT})=(${JS_IDENT})\\?\\.authMethod===\\\`chatgpt\\\`,` +
       `(${JS_IDENT})=\\2\\?\\.authMethod\\?\\?null([\\s\\S]{0,500}?),` +
@@ -96,7 +87,20 @@ function hasApiKeyModelListMappingShape(source) {
   return MODEL_LIST_MAPPING_SHAPE.test(source);
 }
 
+function hasCompleteFallbackFastTierPatch(source) {
+  return (
+    source.includes(`function ${PATCH_MARKER}(`) &&
+    source.includes(`??${PATCH_MARKER}(`) &&
+    source.includes(`[${PATCH_MARKER}(`) &&
+    source.includes(".filter(Boolean)).map")
+  );
+}
+
 function applyFallbackFastTierPatch(source) {
+  if (hasCompleteFallbackFastTierPatch(source)) {
+    return source;
+  }
+
   let patched = source;
 
   if (!patched.includes(`function ${PATCH_MARKER}(`)) {
@@ -133,8 +137,13 @@ function applyFallbackFastTierPatch(source) {
     `...(($1?.serviceTiers?.length?$1.serviceTiers:[${PATCH_MARKER}($1)]).filter(Boolean)).map($2=>({description:$3($2),iconKind:$4($2.id,$2.name),label:$5($2),tier:$2,value:$2.id}))`,
   );
 
-  if (patched !== source || source.includes(PATCH_MARKER)) {
+  if (hasCompleteFallbackFastTierPatch(patched)) {
     return patched;
+  }
+
+  if (patched !== source || source.includes(PATCH_MARKER)) {
+    warn("Could not apply all current service tier option helpers", "API key fallback fast tier patch");
+    return source;
   }
 
   if (source.includes("serviceTiers") && source.includes("defaultServiceTier")) {
@@ -147,27 +156,26 @@ function applyApiKeyServiceTierPatch(source) {
   return applyFallbackFastTierPatch(applyApiKeyModelMarkerPatch(applyApiKeyServiceTierGatePatch(source)));
 }
 
-function applyCurrentGateAndModelPatch(source) {
-  let patched = source;
-  if (
-    source.includes("requirements?.featureRequirements?.fast_mode") ||
-    source.includes("isServiceTierAllowed") ||
-    PATCHED_SERVICE_TIER_GATE.test(source)
-  ) {
-    patched = applyApiKeyServiceTierGatePatch(patched);
-    patched = patched.replace(
-      /async function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{let ([A-Za-z_$][\w$]*)=await ([A-Za-z_$][\w$]*)\(\2,\3\);if\(\4!==`chatgpt`\)return!1;/g,
-      "async function $1($2,$3){let $4=await $5($2,$3);if($4===`apikey`)return!0;if($4!==`chatgpt`)return!1;",
-    );
+function applyCurrentGatePatch(source) {
+  const gateAlreadyPatched = PATCHED_SERVICE_TIER_GATE.test(source);
+  const gateCandidate = gateAlreadyPatched ? source : applyApiKeyServiceTierGatePatch(source);
+  const gateReady = gateAlreadyPatched || gateCandidate !== source;
+
+  if (!gateReady && !hasApiKeyServiceTierGateShape(source)) {
+    warn("Could not identify current service tier auth gate", "API key service tier gate patch");
   }
-  if (
-    source.includes("availableModels:") &&
-    source.includes("supportedReasoningEfforts") ||
-    PATCHED_MODEL_MARKER.test(source)
-  ) {
-    patched = applyApiKeyModelMarkerPatch(patched);
+  return gateCandidate;
+}
+
+function applyCurrentModelPatch(source) {
+  const modelAlreadyPatched = PATCHED_MODEL_MARKER.test(source);
+  const modelCandidate = modelAlreadyPatched ? source : applyApiKeyModelMarkerPatch(source);
+  const modelReady = modelAlreadyPatched || modelCandidate !== source;
+
+  if (!modelReady && !hasApiKeyModelListMappingShape(source)) {
+    warn("Could not identify current model list mapping", "API key model service tier marker patch");
   }
-  return patched;
+  return modelCandidate;
 }
 
 function applyCurrentFallbackFastTierPatch(source) {
@@ -182,21 +190,31 @@ function applyCurrentFallbackFastTierPatch(source) {
 
 const descriptors = [
   {
-    id: "api-key-service-tier-gate-model",
+    id: "api-key-service-tier-gate",
     phase: "webview-asset",
     order: 20600,
     ciPolicy: "optional",
-    pattern: CURRENT_MODEL_ASSET_PATTERN,
-    missingDescription: "current API key service tier gate/model bundle",
-    skipDescription: "API key service tier gate/model patch",
-    apply: applyCurrentGateAndModelPatch,
+    pattern: /^app-initial~app-main~onboarding-page-[^.]+\.js$/,
+    missingDescription: "current API key service tier gate bundle",
+    skipDescription: "API key service tier gate patch",
+    apply: applyCurrentGatePatch,
+  },
+  {
+    id: "api-key-service-tier-model",
+    phase: "webview-asset",
+    order: 20605,
+    ciPolicy: "optional",
+    pattern: /^app-initial~app-main~onboarding-page-[^.]+\.js$/,
+    missingDescription: "current API key service tier model bundle",
+    skipDescription: "API key model service tier marker patch",
+    apply: applyCurrentModelPatch,
   },
   {
     id: "api-key-service-tier-fallback",
     phase: "webview-asset",
     order: 20610,
     ciPolicy: "optional",
-    pattern: CURRENT_SERVICE_TIER_ASSET_PATTERN,
+    pattern: /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-[^.]+\.js$/,
     missingDescription: "current API key service tier fallback bundle",
     skipDescription: "API key fallback fast tier patch",
     apply: applyCurrentFallbackFastTierPatch,
@@ -208,7 +226,8 @@ module.exports = {
   applyApiKeyServiceTierGatePatch,
   applyFallbackFastTierPatch,
   applyApiKeyServiceTierPatch,
-  applyCurrentGateAndModelPatch,
+  applyCurrentGatePatch,
+  applyCurrentModelPatch,
   applyCurrentFallbackFastTierPatch,
   hasApiKeyServiceTierGateShape,
   hasApiKeyModelListMappingShape,

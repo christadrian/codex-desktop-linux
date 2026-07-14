@@ -239,12 +239,37 @@ find_cargo_for_linux_computer_use() {
     return 1
 }
 
+find_system_computer_use_binary() {
+    local name="$1"
+    local candidate
+
+    for candidate in \
+        "$HOME/.cargo/bin/$name" \
+        "$HOME/.local/bin/$name"; do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    candidate="$(command -v "$name" 2>/dev/null || true)"
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    return 1
+}
+
 build_linux_computer_use_backend() {
     local crate_dir="$SCRIPT_DIR/computer-use-linux"
     local backend_binary="$SCRIPT_DIR/target/release/codex-computer-use-linux"
     local cosmic_helper_binary="$SCRIPT_DIR/target/release/codex-computer-use-cosmic"
     local cargo_cmd=""
+    local system_backend=""
+    local system_cosmic=""
 
+    # Step 1: Environment override
     if [ -n "${CODEX_LINUX_COMPUTER_USE_BACKEND_SOURCE:-}" ] || [ -n "${CODEX_LINUX_COMPUTER_USE_COSMIC_SOURCE:-}" ]; then
         [ -n "${CODEX_LINUX_COMPUTER_USE_BACKEND_SOURCE:-}" ] || warn "CODEX_LINUX_COMPUTER_USE_BACKEND_SOURCE is not set"
         [ -n "${CODEX_LINUX_COMPUTER_USE_COSMIC_SOURCE:-}" ] || warn "CODEX_LINUX_COMPUTER_USE_COSMIC_SOURCE is not set"
@@ -255,6 +280,39 @@ build_linux_computer_use_backend() {
         return 0
     fi
 
+    # Steps 2-3 are opt-in: the vendored build stays the default so the
+    # repository only ships code it is responsible for. Set
+    # CODEX_LINUX_COMPUTER_USE_SYSTEM_INSTALL=1 to reuse a system-installed
+    # computer-use-linux (or install it from crates.io) instead of building
+    # the vendored crate.
+    if [ "${CODEX_LINUX_COMPUTER_USE_SYSTEM_INSTALL:-}" = "1" ]; then
+        # Step 2: System-installed binaries
+        if system_backend="$(find_system_computer_use_binary computer-use-linux)" &&
+            system_cosmic="$(find_system_computer_use_binary computer-use-linux-cosmic)"; then
+            info "Using system computer-use-linux MCP binaries: $system_backend"
+            printf '%s\n%s\n' "$system_backend" "$system_cosmic"
+            return 0
+        fi
+
+        # Step 3: Install from crates.io
+        if cargo_cmd="$(find_cargo_for_linux_computer_use)"; then
+            info "Installing computer-use-linux MCP from crates.io..."
+            if "$cargo_cmd" install --locked computer-use-linux >&2; then
+                if system_backend="$(find_system_computer_use_binary computer-use-linux)" &&
+                    system_cosmic="$(find_system_computer_use_binary computer-use-linux-cosmic)"; then
+                    printf '%s\n%s\n' "$system_backend" "$system_cosmic"
+                    return 0
+                fi
+                warn "computer-use-linux binaries missing after crates.io install"
+            else
+                warn "Failed to install computer-use-linux from crates.io; falling back to vendored build"
+            fi
+        else
+            warn "cargo not found for crates.io install; falling back to vendored build"
+        fi
+    fi
+
+    # Step 4: Vendored build fallback
     if [ ! -d "$crate_dir" ]; then
         warn "Linux Computer Use backend source not found at $crate_dir"
         return 1
@@ -265,7 +323,7 @@ build_linux_computer_use_backend() {
         return 1
     fi
 
-    info "Building Linux Computer Use backend..."
+    info "Building Linux Computer Use backend from vendored source..."
     if ! (cd "$SCRIPT_DIR" && "$cargo_cmd" build --release -p codex-computer-use-linux >&2); then
         warn "Failed to build Linux Computer Use backend"
         return 1
@@ -311,6 +369,11 @@ stage_linux_computer_use_plugin() {
     cp "$cosmic_helper_binary" "$target_plugin/bin/codex-computer-use-cosmic"
     chmod 0755 "$target_plugin/bin/codex-computer-use-linux"
     chmod 0755 "$target_plugin/bin/codex-computer-use-cosmic"
+    if [ "${backend_binary##*/}" = "computer-use-linux" ]; then
+        # The published backend resolves its COSMIC helper by this sibling name.
+        cp "$cosmic_helper_binary" "$target_plugin/bin/computer-use-linux-cosmic"
+        chmod 0755 "$target_plugin/bin/computer-use-linux-cosmic"
+    fi
 
     local plugin_icon_source="${LINUX_ICON_SOURCE:-$ICON_SOURCE}"
     if [ -f "$plugin_icon_source" ]; then
@@ -705,6 +768,170 @@ remove_macos_sidecar_files() {
     find "$root" -type f -name '*:com.apple.*' -delete
 }
 
+validate_upstream_bundled_skills() {
+    local skills_dir="$1"
+
+    python3 - "$skills_dir" <<'PY'
+import os
+from pathlib import Path
+import stat
+import sys
+
+root = Path(sys.argv[1])
+
+try:
+    root_metadata = root.lstat()
+except OSError as exc:
+    print(f"cannot inspect bundled skills root: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+if stat.S_ISLNK(root_metadata.st_mode):
+    print("bundled skills root cannot be a symlink", file=sys.stderr)
+    sys.exit(1)
+if not stat.S_ISDIR(root_metadata.st_mode):
+    print("bundled skills root must be a directory", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    resolved_root = root.resolve(strict=True)
+except (OSError, RuntimeError) as exc:
+    print(f"cannot resolve bundled skills root: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+
+def fail_walk(error):
+    print(f"cannot inspect bundled skills tree: {error}", file=sys.stderr)
+    sys.exit(1)
+
+
+for current_root, directories, files in os.walk(root, followlinks=False, onerror=fail_walk):
+    current = Path(current_root)
+    for name in directories + files:
+        path = current / name
+        relative_path = path.relative_to(root)
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            print(f"cannot inspect {relative_path}: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        if stat.S_ISLNK(metadata.st_mode):
+            try:
+                target = os.readlink(path)
+            except OSError as exc:
+                print(f"cannot read symlink {relative_path}: {exc}", file=sys.stderr)
+                sys.exit(1)
+            if os.path.isabs(target):
+                print(f"absolute symlink is not allowed: {relative_path}", file=sys.stderr)
+                sys.exit(1)
+            try:
+                resolved_target = path.resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                print(f"cannot resolve symlink {relative_path}: {exc}", file=sys.stderr)
+                sys.exit(1)
+            try:
+                resolved_target.relative_to(resolved_root)
+            except ValueError:
+                print(f"symlink escapes bundled skills root: {relative_path}", file=sys.stderr)
+                sys.exit(1)
+            try:
+                target_metadata = resolved_target.stat()
+            except OSError as exc:
+                print(f"cannot inspect symlink target {relative_path}: {exc}", file=sys.stderr)
+                sys.exit(1)
+            if not (stat.S_ISDIR(target_metadata.st_mode) or stat.S_ISREG(target_metadata.st_mode)):
+                print(f"unsupported symlink target type: {relative_path}", file=sys.stderr)
+                sys.exit(1)
+            continue
+
+        if not (stat.S_ISDIR(metadata.st_mode) or stat.S_ISREG(metadata.st_mode)):
+            print(f"unsupported file type: {relative_path}", file=sys.stderr)
+            sys.exit(1)
+        if metadata.st_mode & 0o6000:
+            print(f"privileged mode is not allowed: {relative_path}", file=sys.stderr)
+            sys.exit(1)
+PY
+}
+
+stage_upstream_bundled_skills() {
+    local source_skills="$1"
+    local target_skills="$2"
+    local target_parent
+    local staging_skills=""
+    local backup_skills=""
+
+    if [ ! -d "$source_skills" ]; then
+        info "Bundled skills not present in upstream resources; skipping"
+        return 0
+    fi
+    if ! validate_upstream_bundled_skills "$source_skills"; then
+        warn "Bundled skills source contains unsupported content"
+        return 1
+    fi
+
+    target_parent="$(dirname "$target_skills")"
+    mkdir -p "$target_parent"
+    if ! staging_skills="$(mktemp -d "$target_parent/.skills.tmp.XXXXXX")"; then
+        warn "Failed to create staging directory for bundled skills"
+        return 1
+    fi
+    if ! cp -R "$source_skills/." "$staging_skills/"; then
+        rm -rf -- "$staging_skills"
+        warn "Failed to stage bundled skills from upstream resources"
+        return 1
+    fi
+    if ! remove_macos_sidecar_files "$staging_skills"; then
+        rm -rf -- "$staging_skills"
+        warn "Failed to clean macOS sidecar files from bundled skills"
+        return 1
+    fi
+    if ! validate_upstream_bundled_skills "$staging_skills"; then
+        rm -rf -- "$staging_skills" || warn "Failed to clean bundled skills staging directory"
+        warn "Bundled skills failed post-copy validation"
+        return 1
+    fi
+    if ! chmod -R u+rwX,go-w "$staging_skills"; then
+        rm -rf -- "$staging_skills"
+        warn "Failed to normalize bundled skills permissions"
+        return 1
+    fi
+
+    backup_skills="$target_parent/.skills.backup.$$"
+    if ! rm -rf -- "$backup_skills"; then
+        rm -rf -- "$staging_skills"
+        warn "Failed to prepare bundled skills backup"
+        return 1
+    fi
+    if [ -e "$target_skills" ] || [ -L "$target_skills" ]; then
+        if ! mv -- "$target_skills" "$backup_skills"; then
+            rm -rf -- "$staging_skills"
+            warn "Failed to preserve existing bundled skills"
+            return 1
+        fi
+    else
+        backup_skills=""
+    fi
+    if ! mv -- "$staging_skills" "$target_skills"; then
+        rm -rf -- "$staging_skills"
+        if [ -n "$backup_skills" ]; then
+            if mv -- "$backup_skills" "$target_skills"; then
+                warn "Failed to install bundled skills; previous target was restored"
+            else
+                warn "Failed to install bundled skills and previous target could not be restored"
+            fi
+        else
+            warn "Failed to install bundled skills"
+        fi
+        return 1
+    fi
+    if [ -n "$backup_skills" ] && ! rm -rf -- "$backup_skills"; then
+        warn "Failed to clean previous bundled skills backup: $backup_skills"
+        return 1
+    fi
+
+    info "Bundled skills staged from upstream DMG"
+}
+
 chrome_extension_host_arch() {
     case "$ARCH" in
         x86_64) echo "x64" ;;
@@ -777,6 +1004,20 @@ patch_chrome_plugin_for_linux() {
 
     if ! node "$patcher" "$target_plugin" >&2; then
         warn "Chrome plugin Linux patch helper failed; leaving upstream scripts as-is"
+    fi
+}
+
+patch_browser_client_iab_socket_scope() {
+    local client="$1"
+    local patcher="$SCRIPT_DIR/scripts/lib/patch-browser-client-iab-socket-scope.js"
+
+    if [ ! -f "$patcher" ]; then
+        warn "IAB Browser socket scope patch helper not found at $patcher; leaving browser-client.mjs unchanged"
+        return 0
+    fi
+
+    if ! node "$patcher" "$client" >&2; then
+        warn "IAB Browser socket scope patch helper failed; leaving browser-client.mjs unchanged"
     fi
 }
 
@@ -1306,6 +1547,7 @@ stage_browser_plugin_from_upstream() {
     patch_browser_use_native_pipe_import_meta_bridge "$target_client"
     patch_browser_use_site_status_allowlist_fallback "$target_client"
     patch_browser_use_file_url_policy "$target_client"
+    patch_browser_client_iab_socket_scope "$target_client"
 
     info "Browser plugin staged from upstream DMG"
     return 0
@@ -1511,6 +1753,10 @@ install_bundled_plugin_resources() {
     local portable_plugin_names=""
     local portable_plugins=()
 
+    if ! stage_upstream_bundled_skills "$upstream_resources/skills" "$resources_dir/skills"; then
+        return 1
+    fi
+
     if [ ! -f "$source_marketplace" ]; then
         warn "Bundled plugin marketplace not found in upstream app; skipping bundled plugins"
         return 0
@@ -1564,6 +1810,11 @@ install_bundled_plugin_resources() {
 
     install_linux_executable_resource "$upstream_resources/node" "$resources_dir/node" "node runtime" "info" || true
     install_browser_use_node_repl_resource "$upstream_resources" "$resources_dir/node_repl" || true
+
+    # These files become the trust root for user-cache refreshes at runtime.
+    # Normalize them while staging from the accepted DMG instead of blessing a
+    # potentially modified installed tree during launcher startup.
+    chmod -R u+rwX,go-w "$bundled_plugins_dir"
 
     info "Linux-safe bundled plugins installed"
 }

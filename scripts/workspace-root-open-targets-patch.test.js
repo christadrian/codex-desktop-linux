@@ -14,6 +14,17 @@ const {
   enabledWorkspaceRootTargets,
 } = workspaceRootOpenTargetsPatch;
 
+function captureWarnings(callback) {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.map(String).join(" "));
+  try {
+    return { result: callback(), warnings };
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 test("workspace root dropdown adds Linux open targets alongside File Manager", () => {
   const mainSource = [
     "function codexLinuxIdeCommand(){}",
@@ -113,7 +124,7 @@ test("workspace root dropdown follows aliased File Manager callbacks", () => {
   assert.equal(applyWorkspaceRootOpenTargetsPatch(patched, targets), patched);
 });
 
-test("workspace root open targets patch scans current app main page chunk", () => {
+test("workspace root open targets patch scans current shared app main project chunks", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-workspace-root-open-targets-"));
   try {
     const buildDir = path.join(root, ".vite", "build");
@@ -125,31 +136,43 @@ test("workspace root open targets patch scans current app main page chunk", () =
       [
         "function codexLinuxIdeCommand(){}",
         "var lM={id:`vscode`};",
+        "var iN={id:`vscodeInsiders`};",
         "var wN={id:`zed`,platforms:{linux:{label:`Zed`}}};",
         "var Hj={id:`terminal`,platforms:{linux:{label:`Terminal`}}};",
       ].join(""),
     );
-    const currentChunkName = "app-initial~app-main~page-kMhXWEru.js";
     fs.writeFileSync(
-      path.join(assetsDir, currentChunkName),
+      path.join(assetsDir, "app-main-current.js"),
+      "function decoy(){return{target:`fileManager`}}",
+    );
+    const sharedChunkName = "app-initial~app-main~page-current.js";
+    fs.writeFileSync(
+      path.join(assetsDir, sharedChunkName),
       [
         "function CurrentWorkspaceMenu(){",
-        "let g=`/tmp/project`,a=()=>{},b=A(`open-file`),x,S,w;",
-        "x=()=>{if(g==null)return;let e=Ch(g);Ya({path:g,cwd:e,target:`fileManager`,openFile:b.mutate}),a(!1)};",
-        "S=x;",
-        "w=g==null?null:(0,Q.jsx)(ht.Item,{LeftIcon:dR,onSelect:S,children:`File Manager`});",
-        "return w",
+        "let _=`/tmp/project`,a=()=>{},x=A(`open-file`),C,w,E;",
+        "C=()=>{if(_==null)return;let e=S(_);Ta({path:_,cwd:e,target:`fileManager`,openFile:x.mutate}),a(!1)};",
+        "w=C;",
+        "E=_==null?null:(0,$.jsx)(di.Item,{LeftIcon:em,onSelect:w,children:(0,$.jsx)(Gh,{platform:m})});",
+        "return (0,$.jsxs)($.Fragment,{children:[E]})",
         "}",
       ].join(""),
     );
 
-    const result = patchWorkspaceRootOpenTargets(root);
-    const patched = fs.readFileSync(path.join(assetsDir, currentChunkName), "utf8");
+    const first = captureWarnings(() => patchWorkspaceRootOpenTargets(root));
+    const patched = fs.readFileSync(path.join(assetsDir, sharedChunkName), "utf8");
 
-    assert.equal(result.changed, 1);
+    assert.equal(first.result.changed, 1);
+    assert.deepEqual(first.warnings, []);
     assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:vscode/);
+    assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:vscodeInsiders/);
     assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:zed/);
     assert.match(patched, /codexLinuxWorkspaceRootOpenTarget:terminal/);
+
+    const second = captureWarnings(() => patchWorkspaceRootOpenTargets(root));
+    assert.equal(second.result.changed, 0);
+    assert.deepEqual(second.warnings, []);
+    assert.equal(workspaceRootOpenTargetsPatch.status(second.result, second.warnings), "already-applied");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

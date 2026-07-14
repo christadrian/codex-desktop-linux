@@ -25,7 +25,7 @@ assert.equal(applySidebarProjectNameStylePatch(unrelated), unrelated);
 const menu =
   `id:\`composer.intelligenceDropdown.model.title\`;const allowed=${MODEL_ALLOWLIST_MARKER};let ce=models;let le=ce,ue;id:\`composer.intelligenceDropdown.model.rowLabel\`;id:\`composer.intelligenceDropdown.effort.title\`;let Ce=(0,PU.jsxs)(PU.Fragment,{children:[ve,effort]});`;
 const power =
-  "function ARe(e){let t=PRe(FRe,e);if(t.length>=4)return t;let n=PRe(IRe,e);return n.length>=4?n:[]}function MRe(e){return e?.flatMap(({displayName:e,model:t,supportedReasoningEfforts:n})=>[])}";
+  "function ARe(e,t=!1){let n=PRe(t?[...FRe,URe]:FRe,e);if(n.length>=4)return n;let r=PRe(IRe,e);return r.length>=4?r:[]}function MRe(e){return e?.flatMap(({displayName:e,model:t,supportedReasoningEfforts:n})=>{let r=e==null?`Custom`:e,i=n.flatMap(({reasoningEffort:e})=>[e]);return(i.length>0?i:[`medium`]).map(e=>({id:`${t}:${e}`,model:t,modelLabel:r,reasoningEffort:e}))})??[]}function PRe(e,t){return e.flatMap((e,n)=>t?.some(t=>t.model===e.model&&t.supportedReasoningEfforts.some(({reasoningEffort:t})=>t===e.reasoningEffort))?[{...e,powerSettingIndex:n}]:[])}var FRe=[],URe={id:`gpt-5.6-sol:ultra`,model:`gpt-5.6-sol`,modelLabel:`5.6 Sol`,reasoningEffort:`ultra`},IRe=[];";
 assert.match(applyGpt56AllowlistPatch(menu), new RegExp(GPT_56_ALLOWLIST_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 assert.match(applyInlineModelListPatch(menu), new RegExp(INLINE_MODEL_LIST_RUNTIME_MARKER));
 assert.match(
