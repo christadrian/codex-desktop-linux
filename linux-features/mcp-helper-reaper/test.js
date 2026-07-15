@@ -58,7 +58,7 @@ function run(command, args, options = {}) {
   return result;
 }
 
-test("stage hook installs Rust reaper and launcher hooks without wrapping node_repl", () => {
+test("stage hook installs the orphan reaper without wrapping node_repl", () => {
   const tempDir = makeTempDir("codex-mcp-helper-reaper-stage-");
   const appDir = path.join(tempDir, "app");
   const workDir = path.join(tempDir, "work");
@@ -88,11 +88,12 @@ test("stage hook installs Rust reaper and launcher hooks without wrapping node_r
   assert.equal(fs.statSync(path.join(installedRoot, "after-exit.d", "mcp-helper-reaper")).mode & 0o111, 0o111);
   assert.match(fs.readFileSync(nodeRepl, "utf8"), /original node_repl/);
   assert.equal(fs.existsSync(path.join(appDir, "resources", "node_repl.codex-linux-original")), false);
+  assert.equal(fs.existsSync(path.join(installedRoot, "mcp-helper-reaper", "node-repl-wrapper.sh")), false);
 
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
-test("stage hook restores the legacy node_repl wrapper during upgrade", () => {
+test("stage hook restores a node_repl wrapper left by the previous feature version", () => {
   const tempDir = makeTempDir("codex-mcp-helper-reaper-refresh-");
   const appDir = path.join(tempDir, "app");
   const workDir = path.join(tempDir, "work");
@@ -102,7 +103,10 @@ test("stage hook restores the legacy node_repl wrapper during upgrade", () => {
   fs.mkdirSync(path.dirname(nodeRepl), { recursive: true });
   fs.mkdirSync(workDir, { recursive: true });
   writeExecutable(source, "#!/usr/bin/env bash\nexit 0\n");
-  writeExecutable(nodeRepl, "#!/usr/bin/env bash\n# mcp-helper-reaper-node-repl-wrapper\nexit 0\n");
+  writeExecutable(
+    nodeRepl,
+    "#!/usr/bin/env bash\n# mcp-helper-reaper-node-repl-wrapper\nexit 0\n",
+  );
   writeExecutable(originalNodeRepl, "#!/usr/bin/env bash\necho original node_repl\n");
 
   const env = {
@@ -116,6 +120,7 @@ test("stage hook restores the legacy node_repl wrapper during upgrade", () => {
   run("bash", [STAGE], { env });
 
   assert.match(fs.readFileSync(nodeRepl, "utf8"), /original node_repl/);
+  assert.doesNotMatch(fs.readFileSync(nodeRepl, "utf8"), /mcp-helper-reaper-node-repl-wrapper/);
   assert.equal(fs.existsSync(originalNodeRepl), false);
 
   fs.rmSync(tempDir, { recursive: true, force: true });
@@ -137,7 +142,11 @@ test("stage hook finds cargo in HOME cargo bin when PATH omits it", () => {
   fs.mkdirSync(workDir, { recursive: true });
   fs.mkdirSync(path.dirname(nodeRepl), { recursive: true });
   symlinkHostTools(fakeBin, ["bash", "cat", "chmod", "grep", "install", "mkdir", "mv"]);
-  for (const file of ["install-session-hook.sh", "cold-start-hook.sh", "after-exit-hook.sh"]) {
+  for (const file of [
+    "install-session-hook.sh",
+    "cold-start-hook.sh",
+    "after-exit-hook.sh",
+  ]) {
     fs.copyFileSync(path.join(FEATURE_DIR, file), path.join(featureDir, file));
   }
   writeExecutable(nodeRepl, "#!/usr/bin/env bash\necho original node_repl\n");
@@ -177,6 +186,7 @@ chmod 0755 target/release/codex-mcp-helper-reaper
     true,
   );
   assert.match(fs.readFileSync(nodeRepl, "utf8"), /original node_repl/);
+  assert.equal(fs.existsSync(path.join(appDir, "resources", "node_repl.codex-linux-original")), false);
 
   fs.rmSync(tempDir, { recursive: true, force: true });
 });

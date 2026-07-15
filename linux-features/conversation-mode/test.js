@@ -123,6 +123,12 @@ test("dictation endpoint descriptor targets the current dictation bundle", () =>
   assert.equal(descriptor.pattern.test(currentDictationAsset), true);
   assert.equal(descriptor.pattern.test(currentComposerAsset), false);
   assert.equal(descriptor.pattern.test("app-initial~app-main~onboarding-page-BUwCKIcU.js"), true);
+  assert.equal(
+    descriptor.pattern.test(
+      "app-initial~app-main~onboarding-page~debug-window-page~debug-modal-jrWqnMas.js",
+    ),
+    false,
+  );
   assert.equal(descriptor.pattern.test("use-dictation-BUwCKIcU.js"), false);
   assert.equal(descriptor.pattern.test("use-dictation-hotkey-BUwCKIcU.js"), false);
 });
@@ -135,11 +141,11 @@ test("composer descriptor targets only the current primary app bundle", () => {
   assert.equal(descriptor.pattern.test("composer-old.js"), false);
 });
 
-test("current DMG separates dictation and composer ownership", () => {
+test("current DMG co-locates dictation and assistant ownership apart from the composer", () => {
   const dictation = featurePatches.find((patch) => patch.id === "dictation-endpoint");
   const composer = featurePatches.find((patch) => patch.id === "composer-control");
-  const dictationAsset =
-    "app-initial~app-main~onboarding-page-qmFVRsFx.js";
+  const assistant = featurePatches.find((patch) => patch.id === "assistant-observer");
+  const dictationAsset = "app-initial~app-main~onboarding-page-CIkoyvFz.js";
   const composerAsset =
     "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-DRU9Ekz0.js";
   const adjacentComposerAsset =
@@ -147,6 +153,7 @@ test("current DMG separates dictation and composer ownership", () => {
 
   assert.equal(dictation.pattern.test(dictationAsset), true);
   assert.equal(dictation.pattern.test(composerAsset), false);
+  assert.equal(assistant.pattern.test(dictationAsset), true);
   assert.equal(composer.pattern.test(composerAsset), true);
   assert.equal(composer.pattern.test(dictationAsset), false);
   assert.equal(composer.pattern.test(adjacentComposerAsset), false);

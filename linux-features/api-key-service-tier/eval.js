@@ -24,10 +24,14 @@ assert.match(
   /d=!u&&\(a\?c!=null&&c\?\.requirements\?\.featureRequirements\?\.fast_mode!==!1:o===`apikey`\)/,
 );
 assert.match(applyCurrentFallbackFastTierPatch(fallback), /codexLinuxApiKeyFastTier/);
-assert.ok(modelDescriptor.pattern.test("app-initial~app-main~onboarding-page-qmFVRsFx.js"));
+assert.ok(
+  modelDescriptor.pattern.test(
+    "app-initial~app-main~onboarding-page~projects-index-page~hotkey-window-thread-page~quick-ch~iiv1g666-BjNKtmac.js",
+  ),
+);
 assert.match(applyCurrentModelPatch(model), /codexLinuxApiKeyServiceTierModel/);
 assert.match(
-  "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-CnQKtQ6U.js",
+  "app-initial~app-main~hotkey-window-new-thread-page~hotkey-window-home-page~composer-utility-bar-D9zyQF1n.js",
   fallbackDescriptor.pattern,
 );
 console.log("5/5 api-key-service-tier eval scenarios passed");
