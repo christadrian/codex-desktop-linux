@@ -19,16 +19,6 @@ function applyProjectTaskSortPatch(source) {
     return source;
   }
 
-  if (
-    !source.includes("sidebarElectron.sortMenu.manual") ||
-    !source.includes("sidebarElectron.sortMenu.created")
-  ) {
-    console.warn(
-      "WARN: Could not find current project task sort menu markers - skipping project task sort feature patch",
-    );
-    return source;
-  }
-
   if (unpatchedCount !== 1 || patchedCount !== 0) {
     console.warn(
       "WARN: Could not find current project task creation timestamp insertion point - skipping project task sort feature patch",
@@ -45,7 +35,8 @@ const descriptors = [
     phase: "webview-asset",
     order: 20_900,
     ciPolicy: "optional",
-    pattern: /^app-initial~app-main~page-[A-Za-z0-9_-]+\.js$/,
+    pattern:
+      /^app-initial~app-main~onboarding-page~projects-index-page~quick-chat-window-page~codex-micro~iqsnin5k-Bxmd3ja1\.js$/,
     missingDescription: "project task sort webview bundle",
     skipDescription: "project task creation timestamp feature patch",
     apply: applyProjectTaskSortPatch,
