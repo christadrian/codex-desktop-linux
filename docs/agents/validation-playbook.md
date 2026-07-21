@@ -47,7 +47,13 @@ For patch report validation:
 
 ```bash
 scripts/ci/validate-patch-report.js codex-app/.codex-linux/patch-report.json
+node scripts/ci/eval-current-feature-patches.js codex-app/.codex-linux/patch-report.json
 ```
+
+The current-drift eval includes core About-dialog, avatar settings sync, Chrome
+extension status, Browser retained-webview attachment recovery, and updater
+bridge coverage. Native upstream Linux support must report `already-applied`,
+not a warning.
 
 Local installs and scheduled CI share `scripts/validate-upstream-dmg.js` and
 `scripts/lib/upstream-dmg-release-profile.js`. Acceptance must inspect only the

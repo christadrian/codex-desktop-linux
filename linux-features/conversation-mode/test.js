@@ -89,9 +89,9 @@ const explicitButtonMainBundleSource =
   "function codexLinuxReadAloudHandle(e={}){return e.action===`config`?codexLinuxReadAloudConfig():e.action===`setup`?codexLinuxReadAloudSetup(e):e.action===`stop`?codexLinuxReadAloudStop():e.action===`speak`&&e.source===`button`?codexLinuxReadAloudSpeak(e.text,{requireEnabled:!1}):codexLinuxReadAloudReport({spoken:!1,reason:`not-explicit`})}var h={handlers:{\"linux-read-aloud\":async(e)=>codexLinuxReadAloudHandle(e),\"native-desktop-apps\":async()=>({apps:[]})}};";
 
 const currentComposerAsset =
-  "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-current.js";
+  "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
 const currentDictationAsset =
-  "app-initial~app-main~onboarding-page-current.js";
+  "app-initial~avatarOverlayCompositionSurface~app-main~new-thread-panel-page~onboarding-page~~e9wvq029-current.js";
 
 const dictationSource =
   "function Lke({onTranscriptInsert:i,onTranscriptSend:a}){let h={current:null},g={current:null},y={current:[]},b={current:null};let P=async({action:t,handlers:r})=>{let a=`hello`;a.length>0&&(df.getInstance().dispatchMessage(`global-dictation-record-history-item`,{text:a}),t===`send`?r.onTranscriptSend(a):r.onTranscriptInsert(a))},F=async()=>{let e=b.current??`insert`,r=h.current,i=y.current;y.current=[],r&&(r.ondataavailable=null,r.onstop=null),h.current=null,A();await P({action:e,audio:i,handlers:{onTranscriptInsert:i,onTranscriptSend:a}})},L=e=>{b.current=e;let t=h.current;t.state!==`inactive`&&t.stop()};return{startDictation:async()=>{let e=await _Oe({channelCount:1});let t=new MediaRecorder(e);if(h.current=t,y.current=[],t.ondataavailable=e=>{e.data.size>0&&y.current.push(e.data)},t.onstop=()=>{F()},t.start(),u(!0),b.current!=null){t.stop();return}},stopDictation:L}}";
@@ -122,7 +122,7 @@ test("dictation endpoint descriptor targets the current dictation bundle", () =>
   assert.ok(descriptor);
   assert.equal(descriptor.pattern.test(currentDictationAsset), true);
   assert.equal(descriptor.pattern.test(currentComposerAsset), false);
-  assert.equal(descriptor.pattern.test("app-initial~app-main~onboarding-page-BUwCKIcU.js"), true);
+  assert.equal(descriptor.pattern.test(currentDictationAsset), true);
   assert.equal(
     descriptor.pattern.test(
       "app-initial~app-main~onboarding-page~debug-window-page~debug-modal-jrWqnMas.js",
@@ -141,19 +141,22 @@ test("composer descriptor targets only the current primary app bundle", () => {
   assert.equal(descriptor.pattern.test("composer-old.js"), false);
 });
 
-test("current DMG co-locates dictation and assistant ownership apart from the composer", () => {
+test("current DMG routes dictation, assistant, and composer to their owning bundles", () => {
   const dictation = featurePatches.find((patch) => patch.id === "dictation-endpoint");
   const composer = featurePatches.find((patch) => patch.id === "composer-control");
   const assistant = featurePatches.find((patch) => patch.id === "assistant-observer");
-  const dictationAsset = "app-initial~app-main~onboarding-page-CIkoyvFz.js";
+  const dictationAsset = currentDictationAsset;
+  const assistantAsset =
+    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js";
   const composerAsset =
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-DRU9Ekz0.js";
+    currentComposerAsset;
   const adjacentComposerAsset =
     "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~lhgjoyjn-CMTECkzu.js";
 
   assert.equal(dictation.pattern.test(dictationAsset), true);
   assert.equal(dictation.pattern.test(composerAsset), false);
-  assert.equal(assistant.pattern.test(dictationAsset), true);
+  assert.equal(assistant.pattern.test(assistantAsset), true);
+  assert.equal(assistant.pattern.test(dictationAsset), false);
   assert.equal(composer.pattern.test(composerAsset), true);
   assert.equal(composer.pattern.test(dictationAsset), false);
   assert.equal(composer.pattern.test(adjacentComposerAsset), false);
@@ -2209,7 +2212,9 @@ test("assistant render patch preserves the current JSX runtime alias", () => {
 test("assistant observer targets only the current primary thread bundle", () => {
   const descriptor = featurePatches.find((patch) => patch.id === "assistant-observer");
   assert.ok(descriptor);
-  assert.equal(descriptor.pattern.test("app-initial~app-main~onboarding-page-D4eTO0KG.js"), true);
+  assert.equal(descriptor.pattern.test(
+    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js",
+  ), true);
   assert.equal(descriptor.pattern.test("local-conversation-turn-old.js"), false);
   assert.equal(descriptor.pattern.test("local-conversation-thread-old.js"), false);
   assert.equal(descriptor.pattern.test("index-old.js"), false);
@@ -2220,7 +2225,10 @@ test("current assistant observer drift is reported as skipped instead of already
   try {
     const assetsDir = path.join(root, "webview", "assets");
     fs.mkdirSync(assetsDir, { recursive: true });
-    const assetPath = path.join(assetsDir, "app-initial~app-main~onboarding-page-current.js");
+    const assetPath = path.join(
+      assetsDir,
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js",
+    );
     const drifted = "console.log(`current assistant renderer drifted`);";
     fs.writeFileSync(assetPath, drifted);
     const descriptor = featurePatches.find((patch) => patch.id === "assistant-observer");
@@ -2253,7 +2261,13 @@ test("conversation mode patches matching app assets and records report entries",
         fs.writeFileSync(path.join(tempApp, "package.json"), JSON.stringify({ name: "codex" }));
         fs.writeFileSync(
           path.join(assetsDir, currentDictationAsset),
-          `${dictationSource};${assistantRenderSource}`,
+          dictationSource,
+        );
+        const currentAssistantAsset =
+          "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js";
+        fs.writeFileSync(
+          path.join(assetsDir, currentAssistantAsset),
+          assistantRenderSource,
         );
         fs.writeFileSync(path.join(assetsDir, currentComposerAsset), currentComposerControlSource);
 
@@ -2276,7 +2290,7 @@ test("conversation mode patches matching app assets and records report entries",
           /codexLinuxConversationToggle/,
         );
         assert.match(
-          fs.readFileSync(path.join(assetsDir, currentDictationAsset), "utf8"),
+          fs.readFileSync(path.join(assetsDir, currentAssistantAsset), "utf8"),
           /codexLinuxConversationAssistant/,
         );
         for (const name of [

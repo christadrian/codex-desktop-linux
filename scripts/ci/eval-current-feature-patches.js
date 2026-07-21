@@ -5,11 +5,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const EXPECTED_PATCHES = [
+  "linux-about-dialog",
+  "linux-avatar-settings-sync",
+  "linux-chrome-extension-status",
+  "linux-app-updater-bridge",
   "linux-chrome-plugin-auto-install",
   "browser-use-node-repl-approval",
-  "linux-app-server-conversation-hydration",
-  "linux-completed-item-recovery",
-  "linux-workspace-root-open-targets",
+  "linux-browser-use-webview-attach-recovery",
   "linux-tooltip-window-controls-collision",
   "local-environment-action-modal-draft",
   "keybinds-settings",
@@ -33,7 +35,7 @@ const EXPECTED_PATCHES = [
   "feature:remote-mobile-control:linux-remote-control-status-read-guard",
   "feature:custom-endpoint-model-picker:main-bundle-catalog-models",
   "feature:custom-endpoint-model-picker:model-picker-allowlist",
-  "feature:custom-endpoint-model-picker:sidebar-provider-filter",
+  "feature:custom-endpoint-model-picker:composer-menu-models",
 ];
 const PASSING_STATUSES = new Set(["applied", "already-applied"]);
 

@@ -24,4 +24,5 @@ Run the feature tests with:
 
 ```bash
 node --test linux-features/open-target-discovery/test.js
+node linux-features/open-target-discovery/eval.js
 ```

@@ -1833,6 +1833,17 @@ test("Linux remote mobile conversation hydration patch handles current app-serve
   assert.equal(applyLinuxRemoteMobileConversationHydrationPatch(patched), patched);
 });
 
+test("Linux remote mobile conversation hydration handles turn completion without cleanup prelude", () => {
+  const source =
+    "class T{onNotification(e,t){let n={method:e,params:t};switch(n.method){case`turn/completed`:{if(this.frameTextDeltaQueue.drainBefore(()=>{this.onNotification(`turn/completed`,n.params)}))break;let{threadId:e,turn:t}=n.params,r=I(e);if(!this.conversations.get(r)){z.error(`Received turn/completed for unknown conversation`,{safe:{conversationId:r},sensitive:{}});break}}}}}";
+  const patched = applyLinuxRemoteMobileConversationHydrationPatch(source);
+
+  assert.match(patched, /codexLinuxRemoteMobileHydrateLateEvent/);
+  assert.match(patched, /this\.frameTextDeltaQueue\.drainBefore/);
+  assert.match(patched, /Hydrating conversation for turn\/completed/);
+  assert.equal(applyLinuxRemoteMobileConversationHydrationPatch(patched), patched);
+});
+
 test("Linux remote mobile hydration skips turn ids before reading threads", () => {
   const source = syntheticAppServerManagerSignalsBundle();
   const patched = applyLinuxRemoteMobileConversationHydrationPatch(source);

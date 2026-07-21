@@ -8,61 +8,31 @@ const test = require("node:test");
 
 const feature = require("./patch.js");
 const {
+  applyChatGptAuthBridgePatch,
   applyChatGptDualBackendPatch,
-  applyChatNavigationPatch,
+  applyChatGptEntitlementPatch,
+  applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
+  applySitesAvailabilityPatch,
   applySitesPluginAvailabilityPatch,
   chatGptSession,
   descriptors,
 } = feature;
 
-const fixture =
-  "var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});function F8e({accountId:e,accountLoading:t,additionalRolloutEnabled:n,authLoading:r,authMethod:i,authenticatedAccountId:a,plan:o,rolloutEnabled:s,supportedSurface:c}){return c?!s&&!n?{status:`denied`,reason:`rollout-disabled`}:r&&i==null?{status:`loading`}:i===`chatgpt`?t&&(e==null||o==null)?{status:`loading`}:a==null||e==null?{status:`denied`,reason:`missing-account`}:a===e?R8e(o)?{status:`allowed`,accountId:e,plan:o}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}";
-const navigationFixture =
-  "function LJe(){let e=(0,RJe.c)(23),t=xu(Z),n=X(Zte),r=X(Hle),i=X(qS),a=Ld(ov,`quickChat`),o=!r&&i===`hidden`;return o?null:(0,IL.jsx)(G,{id:`sidebarElectron.quickChatNavLink`,defaultMessage:`Chat`})}";
+const entitlementFixture =
+  'function rt({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?ot(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
+const availabilityFixture =
+  'var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});';
+const entitlementAsset =
+  "app-initial~artifact-tab-content.electron~app-main~pull-request-code-review~new-thread-pane~nmo0zeut-RFRJ7pMF.js";
+const availabilityAsset =
+  "app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~k0tdw7da-wn-v3SJs.js";
 const cloudFixture =
   "function vr(){let{access:P}=Sn();return P}function va(e){let{access:I}=Fn(),De=hr({cloudAccess:I,hasGitRepository:H,isBrowser:!1});return(0,Q.jsx)(Ji,{codexCloudAccess:I})}";
 const sitesPluginFixture =
   "const n={js:e=>e,Os:`sites`},bs=[{autoInstallOptOutKey:n.js(n.Os),installWhenMissing:!0,name:n.Os,isAvailable:({features:e})=>e.sites}];globalThis.__sites=bs[0].isAvailable;";
-const currentNavigationFixture =
-  "function IL({chatGptProjectCrudStatus:e,desktopNavItemsEnabled:t,quickChatEnabled:n,sidebarMode:r,onCreateChatGptProject:i}){return r===`codex`&&n?(0,KL.jsx)(kF,{}):null}const label={id:`sidebarElectron.quickChatNavLink`};";
-
-test("exports the ChatGPT desktop auth bridge patch", () => {
-  assert.equal(typeof feature.applyChatGptAuthBridgePatch, "function");
-});
-
-test("falls back to the saved ChatGPT token when custom endpoint auth has none", async () => {
-  const source = '"use strict";const fs=require("node:fs"),os=require("node:os"),path=require("node:path");var JF=class extends Error{constructor(e,t,n){super(e),this.status=t,this.cause=n}};async function XF({appServerClient:e,errorStatus:t,failureMessage:n,refreshToken:r,state:i}){if(!i.attachAuth)return i;if(!r){let t=e.getCachedAuthToken?.();if(t!==void 0)return{...i,tokenSource:`cached`,token:t}}try{let t=await e.getAuthToken({refreshToken:r});return{...i,tokenSource:r?`refreshed`:`loaded`,token:t}}catch(e){throw new JF(n,t,e)}}globalThis.__bridge=XF;';
-
-  await withAuth({ tokens: { account_id: "acct_1", access_token: "chatgpt-token" } }, async () => {
-    const patched = feature.applyChatGptAuthBridgePatch(source);
-    assert.match(patched, /__codexLinuxChatGptSavedAuthToken/);
-    assert.match(patched, /auth\.json/);
-    assert.doesNotMatch(patched, /chatgpt-token/);
-    assert.doesNotThrow(() => new Function("require", patched));
-    new Function("require", patched)(require);
-
-    const missing = await globalThis.__bridge({
-      appServerClient: { getCachedAuthToken: () => "custom-token", getAuthToken: async () => "custom-token" },
-      errorStatus: 432,
-      failureMessage: "missing",
-      refreshToken: false,
-      state: { attachAuth: true, tokenSource: "pending", token: null },
-    });
-    assert.equal(missing.token, "chatgpt-token");
-    assert.equal(missing.tokenSource, "saved-chatgpt");
-
-    const rejected = await globalThis.__bridge({
-      appServerClient: { getCachedAuthToken: () => undefined, getAuthToken: async () => { throw new Error("custom auth"); } },
-      errorStatus: 432,
-      failureMessage: "missing",
-      refreshToken: false,
-      state: { attachAuth: true, tokenSource: "pending", token: null },
-    });
-    assert.equal(rejected.token, "chatgpt-token");
-    delete globalThis.__bridge;
-  });
-});
+const requestRoutingFixture =
+  "var Xi;Xi=class extends Ae{constructor(){super({getAdditionalHeaders:Ei})}async listConversations(){return this.safeGet(`/conversations`)}async getModelsResponse(){return this.safeGet(`/models`)}};globalThis.__chatClient=new Xi;globalThis.__customClient=new Ae;";
 
 function withAuth(auth, fn) {
   const oldHome = process.env.CODEX_HOME;
@@ -75,15 +45,20 @@ function withAuth(auth, fn) {
   try {
     fs.writeFileSync(path.join(home, "auth.json"), JSON.stringify(auth));
     const result = fn();
-    if (result != null && typeof result.then === "function") {
-      return result.finally(cleanup);
-    }
+    if (result != null && typeof result.then === "function") return result.finally(cleanup);
     cleanup();
     return result;
   } catch (error) {
     cleanup();
     throw error;
   }
+}
+
+function applyForAsset(assetName, source) {
+  return descriptors
+    .filter((descriptor) => descriptor.phase === "webview-asset" && descriptor.pattern?.test(assetName))
+    .sort((left, right) => left.order - right.order)
+    .reduce((current, descriptor) => descriptor.apply(current), source);
 }
 
 test("uses the saved ChatGPT account only with an access token", () => {
@@ -95,100 +70,196 @@ test("uses the saved ChatGPT account only with an access token", () => {
   });
 });
 
-test("unlocks ChatGPT Chat and Sites without rerouting custom Codex traffic", () => {
+test("patches the current Chat entitlement for custom endpoints", () => {
   withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
-    const patched = applyChatGptDualBackendPatch(fixture);
+    const patched = applyChatGptEntitlementPatch(entitlementFixture);
     assert.match(patched, /globalThis\.__codexLinuxChatGptBackendSession="acct_1"/);
-    assert.match(patched, /authMethod:i/);
-    assert.match(patched, /status:`allowed`,accountId:globalThis\.__codexLinuxChatGptBackendSession,plan:null/);
+    assert.match(patched, /o&&r!==`chatgpt`\?\{status:`allowed`/);
+    assert.equal(applyChatGptEntitlementPatch(patched), patched);
+    assert.doesNotThrow(() => new Function("ot", patched));
+
+    const entitlement = new Function("ot", `${patched};return rt`)(() => true);
+    assert.deepEqual(
+      entitlement({
+        accountId: null,
+        accountLoading: false,
+        authLoading: false,
+        authMethod: "apikey",
+        authenticatedAccountId: null,
+        plan: null,
+        supportedSurface: true,
+      }),
+      { status: "allowed", accountId: "acct_1", plan: null },
+    );
+    assert.deepEqual(
+      entitlement({
+        accountId: "acct_1",
+        accountLoading: false,
+        authLoading: false,
+        authMethod: "chatgpt",
+        authenticatedAccountId: "acct_1",
+        plan: "plus",
+        supportedSurface: true,
+      }),
+      { status: "allowed", accountId: "acct_1", plan: "plus" },
+    );
+    assert.deepEqual(
+      entitlement({
+        accountId: null,
+        accountLoading: false,
+        authLoading: false,
+        authMethod: "apikey",
+        authenticatedAccountId: null,
+        plan: null,
+        supportedSurface: false,
+      }),
+      { status: "denied", reason: "unsupported-surface" },
+    );
+  });
+});
+
+test("patches current Sites availability independently", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    const patched = applySitesAvailabilityPatch(availabilityFixture);
     assert.match(patched, /__codexLinuxChatGptSitesAvailable/);
     assert.match(patched, /if\(!0\)return`available`/);
+    assert.equal(applySitesAvailabilityPatch(patched), patched);
     assert.doesNotThrow(() => new Function(patched));
-    assert.equal(applyChatGptDualBackendPatch(patched), patched);
+  });
+});
+
+test("combined helper patches split current chunks without execution-order coupling", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    const entitlement = applyChatGptDualBackendPatch(entitlementFixture);
+    const availability = applyChatGptDualBackendPatch(availabilityFixture);
+    assert.match(entitlement, /__codexLinuxChatGptBackendSession/);
+    assert.doesNotMatch(entitlement, /__codexLinuxChatGptSitesAvailable/);
+    assert.match(availability, /__codexLinuxChatGptSitesAvailable/);
+    assert.doesNotMatch(availability, /__codexLinuxChatGptBackendSession/);
   });
 });
 
 test("does not fake-enable ChatGPT surfaces without a saved session", () => {
   withAuth({ tokens: { account_id: "acct_1" } }, () => {
-    assert.equal(applyChatGptDualBackendPatch(fixture), fixture);
+    assert.equal(applyChatGptEntitlementPatch(entitlementFixture), entitlementFixture);
+    assert.equal(applySitesAvailabilityPatch(availabilityFixture), availabilityFixture);
   });
 });
 
-test("shows Chat navigation only with a saved ChatGPT session", () => {
+test("routes Chat entitlement and Sites availability to exact current assets", () => {
   withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
-    const patched = applyChatNavigationPatch(navigationFixture);
-    assert.match(patched, /__codexLinuxChatGptNavVisible/);
-    assert.doesNotMatch(patched, /i===`hidden`/);
-    const currentPatched = applyChatNavigationPatch(currentNavigationFixture);
-    assert.match(currentPatched, /r===`codex`\/\*__codexLinuxChatGptNavVisible\*\//);
-    assert.doesNotMatch(currentPatched, /r===`codex`&&n/);
-  });
-  withAuth({ tokens: { account_id: "acct_1" } }, () => {
-    assert.equal(applyChatNavigationPatch(navigationFixture), navigationFixture);
-    assert.equal(applyChatNavigationPatch(currentNavigationFixture), currentNavigationFixture);
-  });
-});
-
-test("enables Send to cloud with the saved ChatGPT session", () => {
-  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
-    const patched = applyCloudAccessPatch(cloudFixture);
-    assert.equal((patched.match(/__codexLinuxChatGptCloudAccess/g) ?? []).length, 2);
-    assert.match(patched, /codexCloudAccess:I/);
-    assert.equal(applyCloudAccessPatch(patched), patched);
+    assert.match(applyForAsset(entitlementAsset, entitlementFixture), /__codexLinuxChatGptBackendSession/);
+    assert.match(applyForAsset(entitlementAsset, requestRoutingFixture), /__codexLinuxChatGptOfficialBackend/);
+    assert.match(applyForAsset(availabilityAsset, availabilityFixture), /__codexLinuxChatGptSitesAvailable/);
+    assert.equal(
+      applyForAsset("app-initial~app-main~unrelated-old-shape.js", entitlementFixture),
+      entitlementFixture,
+    );
+    assert.deepEqual(
+      descriptors.filter((descriptor) =>
+        descriptor.id === "chatgpt-request-routing" ||
+        descriptor.id.includes("entitlement") ||
+        descriptor.id === "sites-availability")
+        .map((descriptor) => descriptor.id),
+      ["chatgpt-request-routing", "chatgpt-chat-entitlement", "sites-availability"],
+    );
   });
 });
 
-test("keeps the Sites bundled plugin eligible with saved ChatGPT auth", () => {
+test("warns instead of claiming success when the current entitlement drifts", () => {
   withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
-    const patched = applySitesPluginAvailabilityPatch(sitesPluginFixture);
-    assert.match(patched, /__codexLinuxChatGptSitesPluginAvailable/);
-    assert.equal(applySitesPluginAvailabilityPatch(patched), patched);
-    new Function(patched)();
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(" "));
+    try {
+      const drifted = entitlementFixture.replace("supportedSurface:o", "supportedSurface:o,extra:s");
+      assert.equal(applyChatGptEntitlementPatch(drifted), drifted);
+    } finally {
+      console.warn = originalWarn;
+    }
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /current ChatGPT entitlement guard/);
+  });
+});
+
+test("enables Send to cloud and retains Sites plugin with saved ChatGPT auth", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    const cloud = applyCloudAccessPatch(cloudFixture);
+    assert.equal((cloud.match(/__codexLinuxChatGptCloudAccess/g) ?? []).length, 2);
+    assert.equal(applyCloudAccessPatch(cloud), cloud);
+
+    const sites = applySitesPluginAvailabilityPatch(sitesPluginFixture);
+    assert.match(sites, /__codexLinuxChatGptSitesPluginAvailable/);
+    assert.equal(applySitesPluginAvailabilityPatch(sites), sites);
+    new Function(sites)();
     assert.equal(globalThis.__sites({ features: { sites: false } }), true);
     delete globalThis.__sites;
   });
 });
 
-test("does not enable Send to cloud without a saved ChatGPT session", () => {
-  withAuth({ tokens: { account_id: "acct_1" } }, () => {
-    assert.equal(applyCloudAccessPatch(cloudFixture), cloudFixture);
+test("falls back to the saved ChatGPT token before custom endpoint auth", async () => {
+  const source = '"use strict";const fs=require("node:fs"),os=require("node:os"),path=require("node:path");var JF=class extends Error{constructor(e,t,n){super(e),this.status=t,this.cause=n}};async function XF({appServerClient:e,errorStatus:t,failureMessage:n,refreshToken:r,state:i}){if(!i.attachAuth)return i;if(!r){let t=e.getCachedAuthToken?.();if(t!==void 0)return{...i,tokenSource:`cached`,token:t}}try{let t=await e.getAuthToken({refreshToken:r});return{...i,tokenSource:r?`refreshed`:`loaded`,token:t}}catch(e){throw new JF(n,t,e)}}globalThis.__bridge=XF;';
+
+  await withAuth({ tokens: { account_id: "acct_1", access_token: "chatgpt-token" } }, async () => {
+    const patched = applyChatGptAuthBridgePatch(source);
+    assert.match(patched, /__codexLinuxChatGptSavedAuthToken/);
+    assert.doesNotMatch(patched, /chatgpt-token/);
+    new Function("require", patched)(require);
+    const result = await globalThis.__bridge({
+      appServerClient: { getCachedAuthToken: () => "custom-token", getAuthToken: async () => "custom-token" },
+      errorStatus: 432,
+      failureMessage: "missing",
+      refreshToken: false,
+      state: { attachAuth: true, tokenSource: "pending", token: null },
+    });
+    assert.equal(result.token, "chatgpt-token");
+    assert.equal(result.tokenSource, "saved-chatgpt");
+    delete globalThis.__bridge;
   });
 });
 
-test("routes Chat and Sites patches to their current upstream assets", () => {
-  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
-    const applyForAsset = (assetName, source) => descriptors
-      .filter((descriptor) => descriptor.phase === "webview-asset" && descriptor.pattern?.test(assetName))
-      .sort((left, right) => left.order - right.order)
-      .reduce((current, descriptor) => descriptor.apply(current), source);
-    const chat = applyForAsset("app-initial~app-main~page-kMhXWEru.js", currentNavigationFixture);
-    const cloud = applyForAsset("local-remote-dropdown-C3bvVXka.js", cloudFixture);
-    const sites = applyForAsset(
-      "app-initial~app-main~pull-request-code-review~onboarding-page~hotkey-window-thread-page~cha~b76hmflu-y0KJWbm3.js",
-      fixture,
-    );
-    const quickChatEntitlement = applyForAsset(
-      "app-initial~artifact-tab-content.electron~app-main~pull-request-code-review~new-thread-pane~hlwvr2wg-y92DUo_J.js",
-      fixture,
-    );
+test("reads saved ChatGPT auth without depending on minified module aliases", async () => {
+  const source = '"use strict";function unrelated(){let r=require("node:fs");return r.existsSync(".")}var JF=class extends Error{constructor(e,t,n){super(e),this.status=t,this.cause=n}};async function XF({appServerClient:e,errorStatus:t,failureMessage:n,refreshToken:r,state:i}){if(!i.attachAuth)return i;if(!r){let t=e.getCachedAuthToken?.();if(t!==void 0)return{...i,tokenSource:`cached`,token:t}}try{let t=await e.getAuthToken({refreshToken:r});return{...i,tokenSource:r?`refreshed`:`loaded`,token:t}}catch(e){throw new JF(n,t,e)}}globalThis.__bridge=XF;';
 
-    assert.match(chat, /__codexLinuxChatGptNavVisible/);
-    assert.match(cloud, /__codexLinuxChatGptCloudAccess/);
-    assert.match(sites, /globalThis\.__codexLinuxChatGptBackendSession="acct_1"/);
-    assert.match(quickChatEntitlement, /status:`allowed`,accountId:globalThis\.__codexLinuxChatGptBackendSession,plan:null/);
+  await withAuth({ tokens: { account_id: "acct_1", access_token: "chatgpt-token" } }, async () => {
+    const patched = applyChatGptAuthBridgePatch(source);
+    new Function("require", patched)(require);
+    const result = await globalThis.__bridge({
+      appServerClient: { getCachedAuthToken: () => undefined, getAuthToken: async () => undefined },
+      errorStatus: 432,
+      failureMessage: "missing",
+      refreshToken: false,
+      state: { attachAuth: true, tokenSource: "pending", token: null },
+    });
+    assert.equal(result.token, "chatgpt-token");
+    assert.equal(result.tokenSource, "saved-chatgpt");
+    delete globalThis.__bridge;
   });
 });
 
-test("makes Sites available without relying on split Vite chunk execution order", () => {
-  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
-    const entitlementChunk = applyChatGptDualBackendPatch(
-      fixture.replace(/var Ver,VZ;.*?function F8e/s, "function F8e"),
-    );
-    const availabilityChunk = applyChatGptDualBackendPatch(
-      fixture.slice(0, fixture.indexOf("function F8e")),
-    );
-    assert.match(entitlementChunk, /globalThis\.__codexLinuxChatGptBackendSession="acct_1"/);
-    assert.match(availabilityChunk, /if\(!0\)return`available`/);
-    assert.doesNotMatch(availabilityChunk, /typeof globalThis\.__codexLinuxChatGptBackendSession/);
-  });
+test("routes only the dedicated ChatGPT client to the official backend", () => {
+  const patched = applyChatGptRequestRoutingPatch(requestRoutingFixture);
+  assert.match(patched, /__codexLinuxChatGptOfficialBackend/);
+  assert.equal(applyChatGptRequestRoutingPatch(patched), patched);
+
+  class ApiClient {
+    getRequestTarget(endpoint) {
+      return { headers: {}, url: endpoint };
+    }
+  }
+  new Function("Ae", "Ei", patched)(ApiClient, () => ({}));
+  assert.equal(
+    globalThis.__chatClient.getRequestTarget("/models").url,
+    "https://chatgpt.com/backend-api/models",
+  );
+  assert.equal(globalThis.__customClient.getRequestTarget("/models").url, "/models");
+  delete globalThis.__chatClient;
+  delete globalThis.__customClient;
+});
+
+test("exports the current auth bridge and entitlement patch APIs", () => {
+  assert.equal(typeof feature.applyChatGptAuthBridgePatch, "function");
+  assert.equal(typeof feature.applyChatGptEntitlementPatch, "function");
+  assert.equal(typeof feature.applyChatGptRequestRoutingPatch, "function");
+  assert.equal(typeof feature.applySitesAvailabilityPatch, "function");
 });

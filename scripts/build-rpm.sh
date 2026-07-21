@@ -60,6 +60,7 @@ rpm_version_parts() {
 }
 
 main() {
+    prepare_package_build_tmpdir
     validate_max_build_threads
     if [ -z "$RPM_BINARY_PAYLOAD" ] && [ "$MAX_BUILD_THREADS" != "0" ]; then
         RPM_BINARY_PAYLOAD="w19T${MAX_BUILD_THREADS}.zstdio"

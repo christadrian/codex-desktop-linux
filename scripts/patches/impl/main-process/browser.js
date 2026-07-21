@@ -489,6 +489,15 @@ function applyLinuxChromeExtensionStatusPatch(currentSource) {
     return currentSource;
   }
 
+  if (
+    currentSource.includes("t===`win32`||t===`linux`") &&
+    currentSource.includes("Opening Chrome extension settings is only supported on macOS, Windows, and Linux") &&
+    currentSource.includes("if(i===`linux`)") &&
+    currentSource.includes("chromeConfigHome:")
+  ) {
+    return currentSource;
+  }
+
   const fsVar = requireName(currentSource, "node:fs");
   const osVar = requireName(currentSource, "node:os");
   const pathVar = requireName(currentSource, "node:path");

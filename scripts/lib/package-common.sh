@@ -13,6 +13,15 @@ error() {
     exit 1
 }
 
+prepare_package_build_tmpdir() {
+    if [ -z "${TMPDIR:-}" ]; then
+        local cache_root="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}"
+        TMPDIR="${cache_root:-${REPO_DIR:-.}/.cache}/codex-desktop/build-tmp"
+        export TMPDIR
+    fi
+    mkdir -p "$TMPDIR" || error "Unable to create package build temp directory: $TMPDIR"
+}
+
 ensure_file_exists() {
     local path="$1"
     local label="$2"

@@ -8,11 +8,10 @@
 //   node linux-features/custom-endpoint-model-picker/doctor.js --extracted /path/to/extracted-app
 //
 // Checks, in order:
-//   1. config.toml + model catalog (the runtime data source)
+//   1. config.toml + optional model catalog fallback
 //   2. patch-report.json descriptor statuses from the last build
-//   3. the app.asar main bundle: which listModels shape is present (pristine /
-//      v1 / v2 / v3), whether the merge helper is injected
-//   4. webview asset chunks: allowlist guard, catalog/composer injection markers
+//   3. the app.asar main bundle: current listModels patch state
+//   4. exact current webview asset routes and runtime markers
 //
 // Exits non-zero when the feature cannot work in the current install.
 
@@ -61,7 +60,7 @@ try {
   const catalogPath = config.match(/^\s*model_catalog_json\s*=\s*["']([^"']+)["']/m)?.[1];
   const selectedModel = config.match(/^\s*model\s*=\s*["']([^"']+)["']/m)?.[1];
   if (!catalogPath) {
-    fail(`${configPath}: no model_catalog_json key — the picker lists models ONLY from this catalog`);
+    info(`${configPath}: no model_catalog_json key; app-server model/list remains the primary model source`);
   } else {
     pass(`model_catalog_json = ${catalogPath}`);
     try {
@@ -82,7 +81,7 @@ try {
     }
   }
 } catch (error) {
-  fail(`cannot read ${configPath}: ${error.message}`);
+  warn(`cannot read ${configPath}: ${error.message}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +100,7 @@ try {
   for (const name of [
     "feature:custom-endpoint-model-picker:main-bundle-catalog-models",
     "feature:custom-endpoint-model-picker:model-picker-allowlist",
-    "feature:custom-endpoint-model-picker:sidebar-provider-filter",
+    "feature:custom-endpoint-model-picker:composer-menu-models",
   ]) {
     const entry = (report.patches ?? []).find((p) => p.name === name);
     if (!entry) {
@@ -171,18 +170,13 @@ for (const { name, read } of mainSources) {
   bridgeFound = true;
   const helperV3 = source.includes(internals.MAIN_HELPER_MARKER);
   const appliedV3 = source.includes(internals.MAIN_LIST_MODELS_APPLIED_MARKER);
-  const legacyHelper = source.includes("__codexLinuxMergeCustomEndpointCatalogModels=function(");
   const v0 = internals.MAIN_LIST_MODELS_NEEDLE.test(source);
-  const v1 = internals.MAIN_LIST_MODELS_V1_PATCH_NEEDLE.test(source);
-  const v2 = internals.MAIN_LIST_MODELS_V2_PATCH_NEEDLE.test(source);
   const uuidVar = source.match(/`model\/list:\$\{\(0,(\w+)\.randomUUID\)\(\)\}`/)?.[1];
   info(`bridge chunk: ${name}${uuidVar ? ` (randomUUID module var: ${uuidVar})` : ""}`);
   if (appliedV3 && helperV3) {
-    pass(`v3 patch applied (helper + rewritten listModels)`);
+    pass(`current patch applied (helper + rewritten listModels)`);
   } else if (v0) {
     fail(`listModels is PRISTINE upstream — the catalog merge patch is not applied; rebuild with the feature enabled`);
-  } else if (v1 || v2) {
-    fail(`listModels carries a STALE ${v1 ? "v1" : "v2"} patch${legacyHelper ? " + legacy helper" : ""} — rebuild so it upgrades to v3`);
   } else {
     fail(`listModels matches NO known shape — upstream drifted; re-extract the bundle and update the needles (see README)`);
   }
@@ -198,53 +192,46 @@ if (mainSources.length > 0 && !bridgeFound) {
 section(`webview assets (${webviewAssetsDir})`);
 try {
   const assets = fs.readdirSync(webviewAssetsDir).filter((name) => name.endsWith(".js"));
-  const pickerChunks = assets.filter((name) => internals.ALLOWLIST_ASSET_PATTERN.test(name));
-  const sidebarChunks = assets.filter((name) => internals.SIDEBAR_ASSET_PATTERN.test(name));
-  if (pickerChunks.length === 0) {
-    fail(`no chunk matches the allowlist pattern — upstream renamed its chunks; update the descriptor pattern`);
+  const sources = assets.map((name) => ({
+    name,
+    source: fs.readFileSync(path.join(webviewAssetsDir, name), "utf8"),
+  }));
+  const pickerComponents = sources.filter(({ source }) =>
+    /function \w+\(\{authMethod:\w+,availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:\w+,models:\w+,useHiddenModels:\w+\}\)/.test(source),
+  );
+  if (pickerComponents.length === 0) {
+    fail(`no current model-picker component found by content`);
   }
-  let guardHandled = false;
-  let composerInjected = false;
-  let composerNeedleMatches = 0;
-  for (const name of pickerChunks) {
-    const source = fs.readFileSync(path.join(webviewAssetsDir, name), "utf8");
-    const isPickerComponent = /useHiddenModels/.test(source) && /amazonBedrock|models:\w+,useHiddenModels/.test(source);
-    if (internals.PICKER_CURRENT_NEEDLE.test(source) || internals.PICKER_NEEDLE.test(source)) {
-      fail(`${name}: allowlist guard STILL ACTIVE — patch did not run on this chunk`);
-    } else if (internals.PICKER_CURRENT_APPLIED.test(source) || internals.PICKER_GUARD_DISABLED_MARKER.test(source)) {
-      pass(`${name}: allowlist guard disabled (l=!1)`);
-      guardHandled = true;
-    } else if (isPickerComponent) {
-      warn(`${name}: picker component present but guard shape unrecognized (drift?)`);
+  for (const { name, source } of pickerComponents) {
+    if (!internals.MODEL_PICKER_ASSET_PATTERN.test(name)) {
+      fail(`${name}: contains the current picker component but is outside the descriptor route`);
+      continue;
     }
-    if (source.includes(internals.PICKER_COMPOSER_MENU_MARKER)) {
-      composerInjected = true;
-      pass(`${name}: composer-menu catalog injection present`);
+    pass(`${name}: current picker component is inside the exact descriptor route`);
+    if (internals.PICKER_NEEDLE.test(source)) {
+      fail(`${name}: custom-endpoint allowlist guard is still active`);
+    } else if (!source.includes(internals.PICKER_ALLOWLIST_MARKER)) {
+      fail(`${name}: allowlist marker missing; the current guard shape may have drifted`);
     } else {
-      composerNeedleMatches += internals.PICKER_COMPOSER_MENU_NEEDLES.filter((needle) => needle.test(source)).length;
+      pass(`${name}: custom-endpoint allowlist disabled`);
     }
-    if (source.includes(internals.PICKER_WEBVIEW_CATALOG_MARKER)) {
-      pass(`${name}: picker catalog injection present`);
+    if (source.includes(internals.PICKER_ULTRA_MARKER)) pass(`${name}: custom-endpoint Ultra gate enabled`);
+    else fail(`${name}: custom-endpoint Ultra marker missing`);
+    if (source.includes(internals.PICKER_REASONING_FALLBACK_MARKER)) pass(`${name}: reasoning-effort fallback present`);
+    else fail(`${name}: reasoning-effort fallback missing`);
+  }
+
+  const composerChunks = sources.filter(({ name }) => internals.COMPOSER_MENU_ASSET_PATTERN.test(name));
+  if (composerChunks.length !== 1) {
+    fail(`expected exactly one current composer model-menu chunk, found ${composerChunks.length}`);
+  } else if (catalogModelCount > 0) {
+    if (composerChunks[0].source.includes(internals.PICKER_COMPOSER_MENU_MARKER)) {
+      pass(`${composerChunks[0].name}: catalog models injected into composer menu`);
+    } else {
+      fail(`${composerChunks[0].name}: configured catalog was not injected; rebuild after configuring model_catalog_json`);
     }
-    if (source.includes(internals.PICKER_REASONING_FALLBACK_MARKER)) {
-      pass(`${name}: picker reasoning fallback present`);
-    }
-  }
-  if (!guardHandled) {
-    warn(`no chunk shows the disabled allowlist guard — custom models may be filtered out of the picker`);
-  }
-  if (!composerInjected && composerNeedleMatches > 0) {
-    info(`composer-menu needles match ${composerNeedleMatches} site(s) but injection absent — a rebuild (with the catalog configured) will bake it in`);
-  }
-  if (sidebarChunks.length === 0) {
-    warn(`no chunk matches the sidebar pattern`);
   } else {
-    const patched = sidebarChunks.some((name) => {
-      const source = fs.readFileSync(path.join(webviewAssetsDir, name), "utf8");
-      return internals.ASYNC_APPLIED_MARKER.test(source) || internals.SIDEBAR_APPLIED_MARKER.test(source) || internals.BLANK_THREAD_FILTER_APPLIED_MARKER.test(source);
-    });
-    if (patched) pass(`sidebar provider filter applied`);
-    else warn(`sidebar provider filter not detected in ${sidebarChunks.length} matching chunk(s)`);
+    info(`${composerChunks[0].name}: no local catalog configured; composer uses app-server model/list`);
   }
 } catch (error) {
   fail(`cannot read webview assets: ${error.message}`);
@@ -256,7 +243,7 @@ try {
 
 section("verdict");
 if (failures === 0) {
-  console.log(`OK — config, patches, and bundles all look consistent (${catalogModelCount} catalog models should be listed). If the picker is still empty, capture ~/.cache/codex-desktop/launcher.log while opening it.`);
+  console.log(`OK — current model bridge and exact webview routes are consistent (${catalogModelCount} local catalog fallback models). If the picker is still empty, capture ~/.cache/codex-desktop/launcher.log while opening it.`);
 } else {
   console.log(`${failures} failure(s), ${warnings} warning(s) — fix the FAIL lines above, rebuild (./install.sh <dmg> or make build-app && make package && make install), then re-run this doctor.`);
 }

@@ -1,14 +1,14 @@
 # Custom Endpoint Model Picker
 
-Expose the model picker UI when Codex Desktop is configured to use a custom
-model provider endpoint, keep all-provider history visible, and hide untitled
-placeholder rows from the sidebar.
+Expose the current model picker and composer model menu when Codex Desktop is
+configured to use a custom model provider endpoint.
 
 ## How the model list actually works
 
-**The picker never queries the custom endpoint for its models** (no
-`/v1/models` call). The list comes exclusively from a local catalog file that
-you author, referenced from `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`):
+The picker consumes the app-server's `model/list` result. A local catalog is an
+optional metadata and failure fallback when a provider returns incomplete rows
+or cannot list its models. Configure it in `~/.codex/config.toml` (or
+`$CODEX_HOME/config.toml`):
 
 ```toml
 model = "cx/gpt-5.5"                # optional: marks the default entry
@@ -57,19 +57,15 @@ accepted.
      hardcoded `o.randomUUID` / `nB=class` anchors), the injected locals are
      `__cdlx`-prefixed to avoid collisions, and the helper is injected at the
      top of the chunk after any `"use strict"` directive;
-   - stale v1/v2 patched bundles from earlier feature revisions are upgraded
-     in place.
-2. **Model-list webview bundle** — removes the provider allowlist guard that
-   suppresses the picker, and (when the catalog is readable at build time)
-   bakes the catalog into the picker component, the dynamic
-   `available_models` config, and the composer/slash-command menu model reads.
-   The guard removal composes with the optional `api-key-model-visibility`
-   feature when both features patch the same model-list bundle.
+2. **Current model-picker webview bundle** — uses the exact current upstream
+   asset family, removes the provider allowlist guard that suppresses custom
+   models, and (when the catalog is readable at build time) bakes the catalog
+   into the picker component and dynamic `available_models` config.
    Custom endpoints also bypass the upstream Ultra rollout gate, so a catalog
    entry declaring `ultra` exposes both Advanced and Ultra controls.
-3. **Recent-threads webview bundle** — `modelProviders: []` +
-   `sourceKinds: []` per the app-server contract (all providers, default
-   interactive sources), and filters untitled placeholder rows.
+3. **Current composer model-menu bundle** — uses a separate exact descriptor
+   so catalog models reach new-thread and Quick Chat model selection without
+   letting an unrelated chunk report false patch success.
 
 ## Enabling
 
@@ -91,8 +87,8 @@ Then rebuild and reinstall:
 # or: make build-app DMG=... && make package && make install
 ```
 
-The patches only exist at build time, so config/catalog changes that should be
-baked into the webview require a rebuild; the main-process merge reads the
+The patches only exist at build time, so catalog changes that should be baked
+into the webview require a rebuild. The main-process merge reads the optional
 catalog at runtime.
 
 ## Verifying an install (doctor)
@@ -103,10 +99,10 @@ node linux-features/custom-endpoint-model-picker/doctor.js --install-dir /path/t
 node linux-features/custom-endpoint-model-picker/doctor.js --extracted /path/to/extracted-app
 ```
 
-The doctor validates the config + catalog, the patch-report statuses, which
-`listModels` shape is inside the installed `app.asar` (pristine / stale v1 /
-stale v2 / current v3), and the webview chunks — and tells you exactly what to
-fix. Exit code 0 means the install should list your catalog models.
+The doctor validates the optional catalog, patch-report statuses, current
+`listModels` bridge inside the installed `app.asar`, and exact current picker
+and composer asset routes. Exit code 0 means the installed feature is wired to
+the current upstream bundles.
 
 ## Testing
 
@@ -122,7 +118,3 @@ the upstream app changes significantly, the regex needles may drift. The
 descriptors are marked optional, so a mismatch warns instead of failing the
 build — run the doctor after every upstream update, and re-extract fixtures
 from the new bundle before adjusting needles.
-
-The history cleanup only converts the stale `modelProviders:[]` patch back to
-upstream's `modelProviders:null`. This keeps official and custom endpoint
-threads in the same history after switching endpoints.

@@ -8,17 +8,8 @@ const path = require("node:path");
 // Webview needles
 // ---------------------------------------------------------------------------
 
-const API_KEY_VISIBILITY_SUFFIX = String.raw`(?:&&\w+!==\`apikey\`\/\*codexLinuxApiKeyModelVisibility\*\/)?`;
-const PICKER_NEEDLE = new RegExp(
-  String.raw`((?:let )?\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==\`amazonBedrock\`${API_KEY_VISIBILITY_SUFFIX}([,;])`,
-);
-const PICKER_CURRENT_NEEDLE = new RegExp(
-  String.raw`(,\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==\`amazonBedrock\`${API_KEY_VISIBILITY_SUFFIX}(;return \w+\.forEach\()`,
-);
-const PICKER_CURRENT_APPLIED = /function \w+\(\{authMethod:\w+,availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:\w+,models:\w+,useHiddenModels:\w+\}\)\{let \w+=\[\],\w+=null,\w+=!1,/;
-// Applied-detection that also holds when the catalog injection sits between
-// the function head and the declaration list (stale-rebuild re-patch case).
-const PICKER_GUARD_DISABLED_MARKER = /=!1,\w+=\w+\.some\(\w+=>\w+\.supportedReasoningEfforts\.some\(/;
+const PICKER_ALLOWLIST_MARKER = "__codexLinuxCustomEndpointAllowlist";
+const PICKER_NEEDLE = /((?:let )?\w+=)(?:\w+\.useHiddenModels|\w+)&&\w+!==`amazonBedrock`(?:&&\w+!==`apikey`\/\*codexLinuxApiKeyModelVisibility\*\/)?([,;])/;
 const PICKER_WEBVIEW_CATALOG_MARKER = "__codexLinuxCustomEndpointWebviewModels";
 const PICKER_WEBVIEW_NEEDLE = /(function \w+\(\{authMethod:\w+,availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:\w+,models:(\w+),useHiddenModels:\w+\}\)\{)/;
 const PICKER_DYNAMIC_CONFIG_MARKER = "__codexLinuxCustomEndpointDynamicConfigModels";
@@ -27,10 +18,8 @@ const PICKER_REASONING_FALLBACK_MARKER = "__codexLinuxCustomEndpointReasoningFal
 const PICKER_ULTRA_MARKER = "__codexLinuxCustomEndpointUltra";
 const PICKER_ULTRA_NEEDLE = /(function \w+\(\{authMethod:(\w+),availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:(\w+),models:\w+,useHiddenModels:\w+\}\)\{)(?=let \w+=\[\],\w+=null,\w+=[^,;]+,\w+=\w+\.some\(\w+=>\w+\.supportedReasoningEfforts\.some\(\(\{reasoningEffort:\w+\}\)=>\w+===`max`\)\))/;
 const PICKER_COMPOSER_MENU_MARKER = "__codexLinuxCustomEndpointComposerMenuModels";
-const PICKER_COMPOSER_MENU_NEEDLES = [
-  /(,)(\w+)=(\w+)\?\.models(,\{modelSettings:\w+,setModelAndReasoningEffort:\w+\}=\w+\(\w+\),\w+=\w+\.model;)/,
-  /(let \w+=\w+,\w+=)(\w+)\?\.models(,\w+;)/,
-];
+const PICKER_COMPOSER_MENU_NEEDLE = /(let \w+=\w+,\w+=)(\w+)\?\.models(,\w+;)/;
+const PICKER_REASONING_NEEDLE = /((?:,)(\w+)=\[\.\.\.(\w+)\]\.filter\(\(\{reasoningEffort:(\w+)\}\)=>(\w+)\(\4\)&&(\w+)\.has\(\4\)\)),(\w+)=\{(\.\.\.\w+,supportedReasoningEfforts:\2)([,}])/g;
 
 // ---------------------------------------------------------------------------
 // Main-bundle (app-server bridge) needles
@@ -45,19 +34,10 @@ const MAIN_HELPER_MARKER = "__codexLinuxMergeCustomEndpointCatalogModelsV3=funct
 // idempotency marker.
 const MAIN_LIST_MODELS_APPLIED_MARKER = "__cdlxCfg";
 
-// v0: pristine upstream listModels. Captures params var (1), request-id var
+// Pristine current listModels. Captures params var (1), request-id var
 // (2), randomUUID module var (3), and response var (4) so the rewrite reuses
 // the bundle's own identifiers instead of hardcoding minified names.
 const MAIN_LIST_MODELS_NEEDLE = /async listModels\((\w+)\)\{await this\.ensureReady\(\);let (\w+)=`model\/list:\$\{\(0,(\w+)\.randomUUID\)\(\)\}`,(\w+)=await this\.sendInternalRequest\(\{id:\2,method:`model\/list`,params:\1\}\);if\(\4\.error\)throw Error\(\4\.error\.message\?\?`Failed to read available models`\);return \4\.result\}/;
-// v1: the original merge-after-return patch shape (first restore).
-const MAIN_LIST_MODELS_V1_PATCH_NEEDLE = /async listModels\((\w+)\)\{await this\.ensureReady\(\);let (\w+)=`model\/list:\$\{\(0,(\w+)\.randomUUID\)\(\)\}`,(\w+)=await this\.sendInternalRequest\(\{id:\2,method:`model\/list`,params:\1\}\);if\(\4\.error\)throw Error\(\4\.error\.message\?\?`Failed to read available models`\);let (\w+)=\4\.result;try\{\5=__codexLinuxMergeCustomEndpointCatalogModels\(\5,await this\.getUserSavedConfiguration\?\.\(\)\)\}catch\{\}return \5\}/;
-// v2: the error-fallback patch shape (backup-branch fixes).
-const MAIN_LIST_MODELS_V2_PATCH_NEEDLE = /async listModels\((\w+)\)\{await this\.ensureReady\(\);let (\w+)=`model\/list:\$\{\(0,(\w+)\.randomUUID\)\(\)\}`,(\w+)=await this\.sendInternalRequest\(\{id:\2,method:`model\/list`,params:\1\}\),(\w+);try\{\5=await this\.getUserSavedConfiguration\?\.\(\)\}catch\{\}if\(\4\.error\)\{let (\w+)=__codexLinuxMergeCustomEndpointCatalogModels\(\{data:\[\]\},\5\);if\(\6\.data\?\.length\)return \6;throw Error\(\4\.error\.message\?\?`Failed to read available models`\)\}let (\w+)=\4\.result;try\{\7=__codexLinuxMergeCustomEndpointCatalogModels\(\7,\5\)\}catch\{\}return \7\}/;
-const MAIN_LIST_MODELS_UPGRADE_NEEDLES = [
-  MAIN_LIST_MODELS_NEEDLE,
-  MAIN_LIST_MODELS_V1_PATCH_NEEDLE,
-  MAIN_LIST_MODELS_V2_PATCH_NEEDLE,
-];
 
 // Runtime merge helper. Semantics:
 //   * reads model_catalog_json / model from the saved config, falling back to
@@ -172,10 +152,7 @@ function applyModelPickerAllowlistPatch(source) {
     const modelsJson = JSON.stringify(webviewCatalogModels);
     const mergeExpr = (modelsExpr) =>
       `(()=>{let ${PICKER_COMPOSER_MENU_MARKER}=${modelsJson},e=${modelsExpr};return[...${PICKER_COMPOSER_MENU_MARKER},...(e??[]).filter(e=>Array.isArray(e?.supportedReasoningEfforts)&&!${PICKER_COMPOSER_MENU_MARKER}.some(t=>t.model===e.model))]})()`;
-    source = source.replace(PICKER_COMPOSER_MENU_NEEDLES[0], (_match, prefix, modelsVar, dataVar, suffix) =>
-      `${prefix}${modelsVar}=${mergeExpr(`${dataVar}?.models`)}${suffix}`,
-    );
-    source = source.replace(PICKER_COMPOSER_MENU_NEEDLES[1], (_match, prefix, dataVar, suffix) =>
+    source = source.replace(PICKER_COMPOSER_MENU_NEEDLE, (_match, prefix, dataVar, suffix) =>
       `${prefix}${mergeExpr(`${dataVar}?.models`)}${suffix}`,
     );
   }
@@ -196,20 +173,13 @@ function applyModelPickerAllowlistPatch(source) {
     );
   }
   if (!source.includes(PICKER_REASONING_FALLBACK_MARKER)) {
-    source = source.replaceAll(
-      ").filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a",
-      `).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));${PICKER_REASONING_FALLBACK_MARKER}:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a`,
-    );
     source = source.replace(
-      /(let (\w+)=\([^;]+?\)\.filter\(\(\{reasoningEffort:(\w+)\}\)=>pq\(\3\)&&\w+\.has\(\3\)\)),(\w+)=\{(\.\.\.\w+,supportedReasoningEfforts:\2)([,}])/g,
-      `$1;${PICKER_REASONING_FALLBACK_MARKER}:if(!$2.length)$2=t.filter(({reasoningEffort:$3})=>pq($3));let $4={$5$6`,
+      PICKER_REASONING_NEEDLE,
+      `$1;${PICKER_REASONING_FALLBACK_MARKER}:if(!$2.length)$2=$3.filter(({reasoningEffort:$4})=>$5($4));let $7={$8$9`,
     );
   }
-  if (PICKER_CURRENT_APPLIED.test(source) || PICKER_GUARD_DISABLED_MARKER.test(source)) {
+  if (source.includes(PICKER_ALLOWLIST_MARKER)) {
     return source;
-  }
-  if (PICKER_CURRENT_NEEDLE.test(source)) {
-    return source.replace(PICKER_CURRENT_NEEDLE, "$1!1$2");
   }
   if (!PICKER_NEEDLE.test(source)) {
     if (/function \w+\(\{authMethod:\w+,availableModels:\w+,defaultModel:\w+,enabledReasoningEfforts:\w+,includeUltraReasoningEffort:\w+,models:\w+,useHiddenModels:\w+\}\)/.test(source)) {
@@ -219,7 +189,7 @@ function applyModelPickerAllowlistPatch(source) {
     }
     return source;
   }
-  return source.replace(PICKER_NEEDLE, "$1!1$2");
+  return source.replace(PICKER_NEEDLE, `$1!1/*${PICKER_ALLOWLIST_MARKER}*/$2`);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,8 +203,7 @@ function applyMainBundleCatalogModelsPatch(source) {
   if (source.includes(MAIN_LIST_MODELS_APPLIED_MARKER)) {
     return source;
   }
-  const needle = MAIN_LIST_MODELS_UPGRADE_NEEDLES.find((candidate) => candidate.test(source));
-  if (needle == null) {
+  if (!MAIN_LIST_MODELS_NEEDLE.test(source)) {
     if (/async listModels\(/.test(source)) {
       console.warn(
         "WARN: Could not find model/list bridge — skipping custom-endpoint-model-picker catalog model patch",
@@ -243,7 +212,7 @@ function applyMainBundleCatalogModelsPatch(source) {
     return source;
   }
   return injectMainHelper(source).replace(
-    needle,
+    MAIN_LIST_MODELS_NEEDLE,
     (_match, paramsVar, idVar, uuidVar) => buildListModelsReplacement(paramsVar, idVar, uuidVar),
   );
 }
@@ -280,23 +249,11 @@ function applyExtractedAppCatalogModelsPatch(extractedDir) {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar provider filter cleanup
-// ---------------------------------------------------------------------------
-
-const EMPTY_PROVIDER_FILTER = /modelProviders:\[\]/g;
-
-function applySidebarProviderFilterPatch(source) {
-  // An empty provider array means no providers on the official endpoint.
-  // Restore the upstream null filter so endpoint switches share one history.
-  return source.replace(EMPTY_PROVIDER_FILTER, "modelProviders:null");
-}
-
-// ---------------------------------------------------------------------------
 // Descriptors
 // ---------------------------------------------------------------------------
 
-const ALLOWLIST_ASSET_PATTERN = /^(?:models-and-reasoning-efforts|model-list-filter|app-initial~app-main~.*(?:home-ambient-suggestions-content|onboarding-page|new-thread-panel-page)).*\.js$/;
-const SIDEBAR_ASSET_PATTERN = /^(?:app-server-manager-signals|thread-context-inputs|app-initial~app-main~.*)\.js$/;
+const MODEL_PICKER_ASSET_PATTERN = /^app-initial~avatarOverlayCompositionSurface~artifact-tab-content\.electron~app-main~plugin-d~[^.]+\.js$/;
+const COMPOSER_MENU_ASSET_PATTERN = /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-[^.]+\.js$/;
 
 module.exports = {
   descriptors: [
@@ -311,38 +268,33 @@ module.exports = {
       id: "model-picker-allowlist",
       name: "custom-endpoint-model-picker-allowlist",
       phase: "webview-asset",
-      pattern: ALLOWLIST_ASSET_PATTERN,
+      pattern: MODEL_PICKER_ASSET_PATTERN,
       missingDescription: "model picker bundle",
       skipDescription: "custom-endpoint-model-picker allowlist patch",
       apply: applyModelPickerAllowlistPatch,
     },
     {
-      id: "sidebar-provider-filter",
-      name: "custom-endpoint-model-picker-sidebar-filter",
+      id: "composer-menu-models",
+      name: "custom-endpoint-model-picker-composer-menu-models",
       phase: "webview-asset",
-      pattern: SIDEBAR_ASSET_PATTERN,
-      missingDescription: "thread context inputs bundle",
-      skipDescription: "custom-endpoint-model-picker sidebar provider filter patch",
-      apply: applySidebarProviderFilterPatch,
+      pattern: COMPOSER_MENU_ASSET_PATTERN,
+      missingDescription: "composer model menu bundle",
+      skipDescription: "custom-endpoint-model-picker composer model menu patch",
+      apply: applyModelPickerAllowlistPatch,
     },
   ],
   applyExtractedAppCatalogModelsPatch,
   applyMainBundleCatalogModelsPatch,
   applyModelPickerAllowlistPatch,
-  applySidebarProviderFilterPatch,
   readCatalogModelsForWebview,
   internals: {
-    ALLOWLIST_ASSET_PATTERN,
-    SIDEBAR_ASSET_PATTERN,
+    MODEL_PICKER_ASSET_PATTERN,
+    COMPOSER_MENU_ASSET_PATTERN,
     MAIN_HELPER_MARKER,
     MAIN_LIST_MODELS_APPLIED_MARKER,
     MAIN_LIST_MODELS_NEEDLE,
-    MAIN_LIST_MODELS_V1_PATCH_NEEDLE,
-    MAIN_LIST_MODELS_V2_PATCH_NEEDLE,
+    PICKER_ALLOWLIST_MARKER,
     PICKER_NEEDLE,
-    PICKER_CURRENT_NEEDLE,
-    PICKER_CURRENT_APPLIED,
-    PICKER_GUARD_DISABLED_MARKER,
     PICKER_WEBVIEW_CATALOG_MARKER,
     PICKER_WEBVIEW_NEEDLE,
     PICKER_DYNAMIC_CONFIG_MARKER,
@@ -351,7 +303,7 @@ module.exports = {
     PICKER_ULTRA_MARKER,
     PICKER_ULTRA_NEEDLE,
     PICKER_COMPOSER_MENU_MARKER,
-    PICKER_COMPOSER_MENU_NEEDLES,
-    EMPTY_PROVIDER_FILTER,
+    PICKER_COMPOSER_MENU_NEEDLE,
+    PICKER_REASONING_NEEDLE,
   },
 };

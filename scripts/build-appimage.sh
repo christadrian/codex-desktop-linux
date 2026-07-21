@@ -187,6 +187,7 @@ prepare_appdir() {
 }
 
 main() {
+    prepare_package_build_tmpdir
     ensure_app_layout
     ensure_file_exists "$APPRUN_TEMPLATE" "AppImage AppRun template"
     ensure_file_exists "$DESKTOP_TEMPLATE" "AppImage desktop template"

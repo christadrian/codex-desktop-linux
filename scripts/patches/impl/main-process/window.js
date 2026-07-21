@@ -636,6 +636,8 @@ function applyLinuxAboutDialogPatch(currentSource, iconPathExpression) {
     /htmlIconDataUrl:([A-Za-z_$][\w$]*)\?\?\(([A-Za-z_$][\w$]*)\.isEmpty\(\)\?null:\2\.resize\(([^)]*)\)\.toDataURL\(\)\),windowIcon:\2\}/;
   const aboutWindowIconUnsafeRegex =
     /\.\.\.([A-Za-z_$][\w$]*)\.windowIcon\.isEmpty\(\)\?\{\}:\{icon:\1\.windowIcon\}/;
+  const currentAboutIconPromiseWithEmptyFallbackRegex =
+    /\[([A-Za-z_$][\w$]*)\?([A-Za-z_$][\w$]*)\(([^()]+)\):null,([A-Za-z_$][\w$]*)\?([A-Za-z_$][\w$]*)\.nativeImage\.createFromPath\(([^()]+)\):([A-Za-z_$][\w$]*)\.app\.getFileIcon\(([^()]+),\{size:`normal`\}\)\.catch\(\(\)=>\7\.nativeImage\.createEmpty\(\)\)\]/;
   const safeCurrentFileIconRegex =
     /\[[A-Za-z_$][\w$]*\?[A-Za-z_$][\w$]*\([^()]+\):null,[A-Za-z_$][\w$]*\?[A-Za-z_$][\w$]*\.nativeImage\.createFromPath\([^()]+\):[A-Za-z_$][\w$]*\.app\.getFileIcon\([^()]+,\{size:`normal`\}\)\.catch\(\(\)=>null\)\]/;
   const safeBundledIconRegex =
@@ -658,8 +660,11 @@ function applyLinuxAboutDialogPatch(currentSource, iconPathExpression) {
 
   const currentAboutIconPromiseRegex =
     /\[([A-Za-z_$][\w$]*)\?([A-Za-z_$][\w$]*)\(([^()]+)\):null,([A-Za-z_$][\w$]*)\?([A-Za-z_$][\w$]*)\.nativeImage\.createFromPath\(([^()]+)\):([A-Za-z_$][\w$]*)\.app\.getFileIcon\(([^()]+),\{size:`normal`\}\)\]/;
+  const aboutIconPromiseRegex = currentAboutIconPromiseWithEmptyFallbackRegex.test(currentSource)
+    ? currentAboutIconPromiseWithEmptyFallbackRegex
+    : currentAboutIconPromiseRegex;
   if (
-    !currentAboutIconPromiseRegex.test(currentSource) ||
+    !aboutIconPromiseRegex.test(currentSource) ||
     !aboutHtmlIconUnsafeRegex.test(currentSource) ||
     !aboutWindowIconUnsafeRegex.test(currentSource)
   ) {
@@ -670,7 +675,7 @@ function applyLinuxAboutDialogPatch(currentSource, iconPathExpression) {
   let patchedSource = currentSource;
   if (iconPathExpression != null) {
     patchedSource = patchedSource.replace(
-      currentAboutIconPromiseRegex,
+      aboutIconPromiseRegex,
       `[
 process.platform===\`linux\`?null:$1?$2($3):null,
 process.platform===\`linux\`?Promise.resolve((()=>{let __codexLinuxAboutIcon=$5.nativeImage.createFromPath(${iconPathExpression});return __codexLinuxAboutIcon.isEmpty()?null:__codexLinuxAboutIcon})()):$4?$5.nativeImage.createFromPath($6):$7.app.getFileIcon($8,{size:\`normal\`}).catch(()=>null)
@@ -678,7 +683,7 @@ process.platform===\`linux\`?Promise.resolve((()=>{let __codexLinuxAboutIcon=$5.
     );
   } else {
     patchedSource = patchedSource.replace(
-      currentAboutIconPromiseRegex,
+      aboutIconPromiseRegex,
       "[$1?$2($3):null,$4?$5.nativeImage.createFromPath($6):$7.app.getFileIcon($8,{size:`normal`}).catch(()=>null)]",
     );
   }

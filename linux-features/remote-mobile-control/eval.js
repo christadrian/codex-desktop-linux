@@ -20,4 +20,10 @@ assert.equal(
   applyLinuxRemoteMobileConversationHydrationPatch(latestRuntimeStatusSource),
   latestRuntimeStatusSource,
 );
-console.log("4/4 remote-mobile-control eval scenarios passed");
+const latestLateCompletionSource =
+  "class T{onNotification(e,t){let n={method:e,params:t};switch(n.method){case`turn/completed`:{if(this.frameTextDeltaQueue.drainBefore(()=>{this.onNotification(`turn/completed`,n.params)}))break;let{threadId:e,turn:t}=n.params,r=I(e);if(!this.conversations.get(r)){z.error(`Received turn/completed for unknown conversation`,{safe:{conversationId:r},sensitive:{}});break}}}}}";
+const latestLateCompletionPatched =
+  applyLinuxRemoteMobileConversationHydrationPatch(latestLateCompletionSource);
+assert.match(latestLateCompletionPatched, /codexLinuxRemoteMobileHydrateLateEvent/);
+assert.match(latestLateCompletionPatched, /this\.frameTextDeltaQueue\.drainBefore/);
+console.log("5/5 remote-mobile-control eval scenarios passed");

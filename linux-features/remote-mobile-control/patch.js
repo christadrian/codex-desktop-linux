@@ -1029,8 +1029,22 @@ function applyLinuxRemoteMobileConversationHydrationPatch(source) {
         );
     if (turnCompletedNeedle.test(patched)) {
       patched = patched.replace(turnCompletedNeedle, turnCompletedReplacement);
-    } else if (patched.includes("Received turn/completed for unknown conversation")) {
-      console.warn("WARN: Could not find unknown turn/completed needle - skipping remote mobile turn queue patch");
+    } else {
+      const turnCompletedWithoutPreludeNeedle =
+        /if\(!this\.conversations\.get\(([A-Za-z_$][\w$]*)\)\)\{([A-Za-z_$][\w$]*)\.error\(`Received turn\/completed for unknown conversation`,\{safe:\{conversationId:\1\},sensitive:\{\}\}\);break\}/u;
+      if (turnCompletedWithoutPreludeNeedle.test(patched)) {
+        patched = patched.replace(
+          turnCompletedWithoutPreludeNeedle,
+          (_needle, conversationIdVar, loggerVar) =>
+            buildLateUnknownConversationHydrationReplacement(
+              "turn/completed",
+              conversationIdVar,
+              loggerVar,
+            ),
+        );
+      } else if (patched.includes("Received turn/completed for unknown conversation")) {
+        console.warn("WARN: Could not find unknown turn/completed needle - skipping remote mobile turn queue patch");
+      }
     }
   }
 

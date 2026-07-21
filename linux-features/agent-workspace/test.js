@@ -1615,6 +1615,21 @@ test("settings asset patches add navigation, route, visibility, and title", () =
   assert.equal(applyAgentWorkspaceSettingsPagePatch(settingsPage), settingsPage);
 });
 
+test("settings navigation recognizes the current sidebar-only bundle", () => {
+  const source = [
+    "Zt=h({collapseSidebar:{id:`settings.nav.collapseSidebar`}}),",
+    "Qt=[`general-settings`,`local-environments`,`worktrees`,`data-controls`],",
+    "$t=[{key:`coding`,slugs:[`local-environments`,`environments`,`worktrees`]}];",
+  ].join("");
+
+  const patched = applyAgentWorkspaceSettingsPagePatch(source);
+  assert.match(patched, /`local-environments`,`agent-workspaces`,`worktrees`/);
+  assert.match(
+    patched,
+    /slugs:\[`local-environments`,`agent-workspaces`,`environments`,`worktrees`\]/,
+  );
+});
+
 test("agent-workspace feature participates in ASAR patching and reports", () => {
   withTempFeatureConfig(["agent-workspace"], (featuresRoot) => {
     withLinuxFeatureRootEnv(featuresRoot, () => {

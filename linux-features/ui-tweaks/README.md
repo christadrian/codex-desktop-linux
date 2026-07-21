@@ -206,4 +206,5 @@ Run the feature tests with:
 
 ```bash
 node --test linux-features/ui-tweaks/test.js
+node linux-features/ui-tweaks/eval.js
 ```

@@ -44,6 +44,7 @@ map_arch() {
 }
 
 main() {
+    prepare_package_build_tmpdir
     validate_max_build_threads
 
     ensure_app_layout

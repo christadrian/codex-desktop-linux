@@ -22,7 +22,13 @@ ELECTRON_VERSION="41.3.0"
 ELECTRON_HEADERS_URL="${ELECTRON_HEADERS_URL:-${npm_config_disturl:-${NPM_CONFIG_DISTURL:-https://artifacts.electronjs.org/headers/dist}}}"
 ELECTRON_MIRROR="${ELECTRON_MIRROR:-}"
 MIN_BETTER_SQLITE3_VERSION_FOR_ELECTRON_41="12.9.0"
-WORK_DIR="$(mktemp -d)"
+if [ -z "${TMPDIR:-}" ]; then
+    TMPDIR="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}"
+    TMPDIR="${TMPDIR:-$SCRIPT_DIR/.cache}/codex-desktop/build-tmp"
+    export TMPDIR
+fi
+mkdir -p "$TMPDIR"
+WORK_DIR="$(mktemp -d "$TMPDIR/install.XXXXXX")"
 ARCH="$(uname -m)"
 ICON_SOURCE="$SCRIPT_DIR/assets/codex.png"
 LINUX_ICON_SOURCE="${CODEX_LINUX_ICON_SOURCE:-}"

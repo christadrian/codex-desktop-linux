@@ -1911,10 +1911,13 @@ function isAgentWorkspaceSettingsRouteBundleSource(currentSource) {
 
 function isAgentWorkspaceSettingsNavigationBundleSource(currentSource) {
   return (
-    /[A-Za-z_$][\w$]*=\{[^;]*"local-environments":[A-Za-z_$][\w$]*,[^;]*worktrees:/.test(currentSource) &&
     currentSource.includes("slugs:[`") &&
     currentSource.includes("`local-environments`") &&
-    currentSource.includes("`worktrees`")
+    currentSource.includes("`worktrees`") &&
+    (
+      /[A-Za-z_$][\w$]*=\{[^;]*"local-environments":[A-Za-z_$][\w$]*,[^;]*worktrees:/.test(currentSource) ||
+      currentSource.includes("settings.nav.collapseSidebar")
+    )
   );
 }
 

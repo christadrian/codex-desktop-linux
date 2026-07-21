@@ -202,7 +202,7 @@ function applyCurrentBootstrapUpdaterBridgePatch(currentSource) {
   patchedSource = migrateLinuxUpdaterBridgeSource(patchedSource);
 
   const destructureRegex =
-    /let\{startedAtMs:([A-Za-z_$][\w$]*),buildFlavor:([A-Za-z_$][\w$]*),desktopSentry:([A-Za-z_$][\w$]*),sparkleManager:([A-Za-z_$][\w$]*),setSparkleBridgeHandlers:([A-Za-z_$][\w$]*),setSecondInstanceArgsHandler:([A-Za-z_$][\w$]*)\}=([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(\),/;
+    /let\{startedAtMs:([A-Za-z_$][\w$]*),buildFlavor:([A-Za-z_$][\w$]*),desktopSentry:([A-Za-z_$][\w$]*),sparkleManager:([A-Za-z_$][\w$]*),(?:productionAppcastStateStore:[A-Za-z_$][\w$]*,)?setSparkleBridgeHandlers:([A-Za-z_$][\w$]*),setSecondInstanceArgsHandler:([A-Za-z_$][\w$]*)\}=([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(\),/;
   const destructureMatch = patchedSource.match(destructureRegex);
   const sparkleVar = destructureMatch?.[4] ?? null;
   const setSparkleBridgeHandlersVar = destructureMatch?.[5] ?? null;
@@ -244,7 +244,12 @@ function applyCurrentBootstrapUpdaterBridgePatch(currentSource) {
     } else {
       const currentBridgeRegex =
         /let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\(\),([A-Za-z_$][\w$]*)=null,([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)=>\{[^]*?\};/;
-      const currentBridgeMatch = patchedSource.match(currentBridgeRegex);
+      const currentClassBridgeRegex =
+        /let ([A-Za-z_$][\w$]*)=new ([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)=null,([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)=>\{[^]*?\};/;
+      const activeBridgeRegex = currentBridgeRegex.test(patchedSource)
+        ? currentBridgeRegex
+        : currentClassBridgeRegex;
+      const currentBridgeMatch = patchedSource.match(activeBridgeRegex);
       if (currentBridgeMatch == null) {
         console.warn("WARN: Could not find current updater callback bridge - skipping Linux updater bridge patch");
         return currentSource;
@@ -252,7 +257,7 @@ function applyCurrentBootstrapUpdaterBridgePatch(currentSource) {
       const [bridgeDeclaration, quitControllerVar, quitFactoryVar, preservedVar, quitFnVar] = currentBridgeMatch;
       const bridgeSetup =
         `${bridgeDeclaration}codexLinuxPackageUpdateBridge=process.platform===\`linux\`?codexLinuxCreatePackageUpdateManager({allowQuit:()=>${quitControllerVar}.allowQuitTemporarilyForUpdateInstall(),${sendCallback}}):null;codexLinuxPackageUpdateBridge!=null&&(${sparkleVar}=codexLinuxPackageUpdateBridge.manager,${quitFnVar}=codexLinuxPackageUpdateBridge.quitForUpdate,setInterval(()=>codexLinuxPackageUpdateBridge.refresh(),3e4).unref?.());`;
-      patchedSource = patchedSource.replace(currentBridgeRegex, bridgeSetup);
+      patchedSource = patchedSource.replace(activeBridgeRegex, bridgeSetup);
     }
   }
 

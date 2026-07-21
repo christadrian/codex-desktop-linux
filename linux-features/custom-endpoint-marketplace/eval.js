@@ -6,26 +6,19 @@ const { applyMarketplaceHidePatch } = require("./patch.js");
 
 const scenarios = [
   {
-    name: "marketplace hide guard disabled for custom endpoints",
+    name: "current shared marketplace hook stays visible for custom endpoints",
     run() {
+      const descriptor = require("./patch.js").descriptors[0];
+      assert.match(
+        "app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~d8yqlw7s-DLBl6kj-.js",
+        descriptor.pattern,
+      );
       const source =
-        'function we(e,t,s){let c=(0,me.c)(53),l;c[0]===e?l=c[1]:(l={hostId:e},c[0]=e,c[1]=l);let u=ue(l)&&(s?.enabled??!0),d=s?.additionalMarketplaceKinds??_e,f=s?.installSuggestionPluginNames??null,p=re(`4218407052`),m=pe(ae(e)?.authMethod??null),h=ve;m?h=xe:p&&(h=be);let g=Ae({additionalMarketplaceKinds:d,includeRemoteCatalog:s?.includeRemoteCatalog??!0,includeVerticalCatalog:!p}),_=ie()';
+        'function Vt(e,t,i){let a=(0,bn.c)(65),o;a[0]===e?o=a[1]:(o={hostId:e},a[0]=e,a[1]=o);let s=ue(o)&&(i?.enabled??!0),c=i?.additionalMarketplaceKinds??Tn,l=i?.installSuggestionPluginNames??null,u=ie(`4218407052`),d=ce(e)?.authMethod??null,f;a[2]===d?f=a[3]:(f=we(d),a[2]=d,a[3]=f);let p=f,m=i?.includeRemoteCatalog??!0,ee=!u,h}';
       const patched = applyMarketplaceHidePatch(source);
-      // After patch: h always stays ve (empty, hide nothing)
-      assert.match(patched, /h=ve;0;let g=Ae\(/);
-      // Old hide logic removed
-      assert.doesNotMatch(patched, /m\?h=xe:p&&\(h=be\)/);
-      // p and m still present (for includeVerticalCatalog and other uses)
-      assert.match(patched, /4218407052/);
-      assert.match(patched, /authMethod/);
-    },
-  },
-  {
-    name: "latest memoized auth guard is forced visible",
-    run() {
-      const source =
-        'let c=Gy(`4218407052`),l=min(e)?.authMethod??null,u;r[2]===l?u=r[3]:(u=Nmn(l),r[2]=l,r[3]=u);let d=u,f=n?.includeRemoteCatalog??!0';
-      assert.match(applyMarketplaceHidePatch(source), /let d=!1,f=/);
+      assert.match(patched, /let p=!1,m=/);
+      assert.doesNotMatch(patched, /let p=f,m=/);
+      assert.equal(applyMarketplaceHidePatch(patched), patched);
     },
   },
 ];

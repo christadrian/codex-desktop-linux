@@ -8,25 +8,21 @@ The Codex webview hides curated marketplaces (`openai-curated`, `openai-curated-
 when the auth method is non-standard. Custom endpoints (9router, Ollama, etc.) trigger
 this hiding, so the "OpenAI Marketplace" and "Anthropic Marketplace" tabs disappear.
 
-This feature patches the shared plugins webview bundle to disable the
-auth-method-based and statsig-gate-based marketplace hiding. The latest bundle
-memoizes that auth check, so the patch forces its resulting hide flag to
-`false`.
+This feature patches the current shared plugins hook to force its memoized
+`shouldHideOpenAICuratedMarketplaces` value to `false`. The independent remote
+marketplace rollout gate remains unchanged.
 
 ### Patched logic
 
 Before:
 ```js
-h=ve;m?h=xe:p&&(h=be)  // can reassign h to hide marketplaces
+let p=f,m=includeRemoteCatalog // f is the memoized auth hide flag
 ```
 
 After:
 ```js
-h=ve;0                  // h always stays ve (hide nothing)
+let p=false,m=includeRemoteCatalog
 ```
-
-Where `ve = []` (empty array), `xe = ["openai-curated", "openai-curated-remote"]`,
-`be = ["openai-curated"]`.
 
 ## Enabling
 
@@ -55,8 +51,8 @@ since marketplaces and model selection UI are linked.
 ## Testing
 
 ```bash
-node --test linux-features/local/custom-endpoint-marketplace/test.js
-node linux-features/local/custom-endpoint-marketplace/eval.js
+node --test linux-features/custom-endpoint-marketplace/test.js
+node linux-features/custom-endpoint-marketplace/eval.js
 ```
 
 ## Risks

@@ -152,6 +152,8 @@ page/bridge, so the Codex conversation stays focused on the thread instead of
 competing with the floating viewer.
 The feature only patches the Electron bridge and the Settings webview bundles;
 conversation and composer webview assets stay untouched.
+The Settings navigation patch supports the current split where route metadata
+and the sidebar slug lists live in separate bundles.
 
 The dedicated Settings page owns local start approvals: pressing
 **Start** first runs a dry-run preview and renders an **Approve hidden

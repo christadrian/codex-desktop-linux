@@ -14,3 +14,10 @@ Enable it in `linux-features/features.json`:
 
 The webview patch is optional, fail-soft, and idempotent. If the upstream
 composer bundle changes shape, the patch warns and leaves the bundle unchanged.
+
+## Testing
+
+```bash
+node --test linux-features/persistent-status-panel/test.js
+node linux-features/persistent-status-panel/eval.js
+```

@@ -134,15 +134,17 @@ test("persists Copilot reasoning effort through the current default writer", () 
 
 test("current DMG descriptors target only the owning Copilot chunks", () => {
   const settingsChunk =
-    "app-initial~app-main~onboarding-page-qmFVRsFx.js";
+    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~2gcv58yj-current.js";
+  const modelListChunk =
+    "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js";
   const uiChunk =
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-DRU9Ekz0.js";
+    "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
   const adjacentChunk =
     "app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~d4kxte0o-BsjKAgmz.js";
   const loaded = require("./patch.js").descriptors;
 
   assert.equal(loaded[0].pattern.test(settingsChunk), true);
-  assert.equal(loaded[1].pattern.test(settingsChunk), true);
+  assert.equal(loaded[1].pattern.test(modelListChunk), true);
   assert.equal(loaded[2].pattern.test(uiChunk), true);
   assert.ok(loaded.every((descriptor) => descriptor.pattern.test(adjacentChunk) === false));
 });
@@ -221,11 +223,13 @@ test("feature descriptor loader exposes the Copilot webview asset patches only w
     );
     assert.ok(descriptors.every((descriptor) => descriptor.ciPolicy === "optional"));
     const currentSettingsChunk =
-      "app-initial~app-main~onboarding-page-current.js";
+      "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~2gcv58yj-current.js";
+    const currentModelListChunk =
+      "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js";
     const currentUiChunk =
-      "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-current.js";
+      "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
     assert.match(currentSettingsChunk, descriptors[0].pattern);
-    assert.match(currentSettingsChunk, descriptors[1].pattern);
+    assert.match(currentModelListChunk, descriptors[1].pattern);
     assert.match(currentUiChunk, descriptors[2].pattern);
     assert.ok(descriptors.every((descriptor) => !descriptor.pattern.test("unrelated-bundle.js")));
   });
@@ -234,16 +238,23 @@ test("feature descriptor loader exposes the Copilot webview asset patches only w
 test("enabled feature descriptors patch the current app settings chunk", () => {
   const featuresRoot = path.resolve(__dirname, "..");
   const currentSettingsChunk =
-    "app-initial~app-main~onboarding-page-qmFVRsFx.js";
+    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~2gcv58yj-current.js";
+  const currentModelListChunk =
+    "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js";
   const currentUiChunk =
-    "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-DRU9Ekz0.js";
+    "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
 
   withTempFeatureConfig(["copilot-reasoning-effort"], () => {
     withTempDir((extractedDir) => {
       writeAsset(
         extractedDir,
         currentSettingsChunk,
-        `${currentCopilotReasoningEffortSettingsFixture()};${currentFilteredCopilotReasoningEffortModelListFixture()}`,
+        currentCopilotReasoningEffortSettingsFixture(),
+      );
+      writeAsset(
+        extractedDir,
+        currentModelListChunk,
+        currentFilteredCopilotReasoningEffortModelListFixture(),
       );
       writeAsset(extractedDir, currentUiChunk, currentCopilotReasoningEffortUiFixture());
 
@@ -252,10 +263,11 @@ test("enabled feature descriptors patch the current app settings chunk", () => {
       );
       applyWebviewAssetPatchDescriptors(extractedDir, descriptors, {}, null);
       const patched = readAsset(extractedDir, currentSettingsChunk);
+      const patchedModelList = readAsset(extractedDir, currentModelListChunk);
 
       assert.match(patched, /copilot-default-reasoning-effort/);
-      assert.match(patched, /a=\[\.\.\.t\]\.filter/);
-      assert.doesNotMatch(patched, /e===`copilot`\?\[/);
+      assert.match(patchedModelList, /a=\[\.\.\.t\]\.filter/);
+      assert.doesNotMatch(patchedModelList, /e===`copilot`\?\[/);
       assert.match(readAsset(extractedDir, currentUiChunk), /reasoningEffortDisabled:!1/);
       assert.match(readAsset(extractedDir, currentUiChunk), /O=s&&f&&!0,k/);
     });

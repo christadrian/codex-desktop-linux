@@ -106,6 +106,11 @@ function applyLinuxQueryCacheInvalidationBroadcastPatch(currentSource) {
     return currentSource;
   }
 
+  // Current upstream no longer exposes query-cache-invalidate through desktop IPC.
+  if (!currentSource.includes("query-cache-invalidate")) {
+    return currentSource;
+  }
+
   const original =
     "case`query-cache-invalidate`:{t.queryKey[0]===`plugins`&&Sr(this.getAppServerConnection(this.hostId));let n=this.getIpcClientForWebContents(e);n&&await n.sendBroadcast(`query-cache-invalidate`,{queryKey:t.queryKey});break}";
   if (!currentSource.includes(original)) {

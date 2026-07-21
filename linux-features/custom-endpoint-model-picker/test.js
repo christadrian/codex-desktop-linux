@@ -11,7 +11,6 @@ const {
   applyMainBundleCatalogModelsPatch,
   applyExtractedAppCatalogModelsPatch,
   applyModelPickerAllowlistPatch,
-  applySidebarProviderFilterPatch,
 } = require("./patch.js");
 const {
   enabledLinuxFeatureIds,
@@ -24,39 +23,18 @@ const {
   patchExtractedApp,
 } = require("../../scripts/patches/runner.js");
 
-const pickerFixture =
-  'function init(){let e=n.useHiddenModels&&t!==`amazonBedrock`,r=[{name:"foo"}];r.forEach(console.log)}';
-const pickerPatched =
-  'function init(){let e=!1,r=[{name:"foo"}];r.forEach(console.log)}';
 const currentPickerFixture =
-  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
-const currentPickerPatched =
-  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let __codexLinuxCustomEndpointUltra=e===`apikey`||e===`apiKey`;i=i||__codexLinuxCustomEndpointUltra;let s=[],c=null,l=!1,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model):!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=(e===`copilot`?[t.find(e=>e.reasoningEffort===`medium`)??{reasoningEffort:`medium`,description:`medium effort`}]:t).filter(({reasoningEffort:e})=>pq(e)&&r.has(e));__codexLinuxCustomEndpointReasoningFallback:if(!a.length)a=t.filter(({reasoningEffort:e})=>pq(e));let o={...n,supportedReasoningEfforts:a};s.push(o),n.isDefault&&(c=o)}}),{models:s,defaultModel:c}}';
-const apiKeyVisibilityPickerFixture = currentPickerFixture.replace(
-  'l=o&&e!==`amazonBedrock`',
-  'l=o&&e!==`amazonBedrock`&&e!==`apikey`/*codexLinuxApiKeyModelVisibility*/',
-);
+  'function vbe({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model)||n.model.startsWith(`gpt-5.6-`)&&!n.hidden:!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=[...t].filter(({reasoningEffort:e})=>Re(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a,codexLinuxApiKeyServiceTierModel:e===`apikey`};s.push(o),n.isDefault&&(c=o)}}),c??=s.find(e=>e.model===n)??null,{models:s,defaultModel:c,hasModelSupportingMaxReasoningEffort:u,hasModelSupportingUltraReasoningEffort:d}}';
+const latestPickerFixture =
+  currentPickerFixture.replace("function vbe", "function Ue");
+const latestPickerAsset =
+  'app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-Dt2LYVtU.js';
 const dynamicConfigFixture =
   'function cMt(e){let t=Wu(K()).safeParse(e.available_models),n=zu().safeParse(e.use_hidden_models),r=K().safeParse(e.default_model);return{availableModels:new Set(t.success?t.data:vq),useHiddenModels:n.success?n.data:yq.useHiddenModels,defaultModel:r.success?r.data:yq.defaultModel}}';
 const composerMenuFixture =
-  'function _F({conversationId:e,hideLabel:t}){let n=io(qe),r=Do(e),i=bd(r.hostId),a=Kn(),{data:o,status:s}=$s({hostId:r.hostId}),c=o?.models,{modelSettings:l,setModelAndReasoningEffort:u}=Nn(e),d=l.model;return bm({model:d,models:c,modelOptionsDisabled:s===`error`})}';
-const slashCommandModelFixture =
-  'function Cz(e){let{data:c,status:l}=$s(s),u=ru(l),d=u,{modelSettings:f,setModelAndReasoningEffort:p}=Nn(n),{serviceTierSettings:m}=X(n),h=Y(),g=m.selectedServiceTier,_,v;let y=v,b=c?.models,x;t[8]!==f.model||t[9]!==b?(x=wz(f.model,b),t[8]=f.model,t[9]=b,t[10]=x):x=t[10];return{models:b,description:x}}';
-
-const sidebarFixture =
-  'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s})}';
-const sidebarPatched =
-  sidebarFixture;
-const sidebarStateDbOnlyFixture =
-  'listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!0}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s,useStateDbOnly:n})}';
-const sidebarStateDbOnlyPatched =
-  sidebarStateDbOnlyFixture;
-const currentSidebarFixture =
-  'async runRecentConversationRefresh(){let s=await this.listRecentThreads({limit:a,cursor:null,useStateDbOnly:i});let c=s.data;if(i){}}async listRecentThreads({cursor:e,limit:t,useStateDbOnly:n=!1}){let r={limit:t,cursor:e,sortKey:this.params.requestClient.getCompatibleThreadSortKey(this.recentConversationSortKey),modelProviders:null,archived:!1,sourceKinds:oh,useStateDbOnly:n};return this.params.requestClient.sendRequest(`thread/list`,r)}';
-const currentSidebarPatched =
-  currentSidebarFixture;
-const currentSidebarAsset =
-  'app-initial~app-main~hotkey-window-thread-page~thread-app-shell-chrome~header~remote-conver~h59fr3q5-Cm3GYhJA.js';
+  'function FP(e){let t=(0,LP.c)(14),{fromModel:n,toModel:r}=e,{data:i}=gr(),a=i?.models,o;t[0]!==n||t[1]!==a?(o=IP(n,a),t[0]=n,t[1]=a,t[2]=o):o=t[2];let s=o,c=i?.models,l;t[3]!==c||t[4]!==r?(l=IP(r,c),t[3]=c,t[4]=r,t[5]=l):l=t[5];return{from:s,to:l}}';
+const composerMenuAsset =
+  'app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-DE26mzOH.js';
 
 const mainBundleFixture =
   'var nB=class{async getUserSavedConfiguration(e){return(await this.readConfig({includeLayers:!1,cwd:e??null})).config}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}async startThread(e){}}';
@@ -69,13 +47,6 @@ const mainBundleIdCollisionFixture =
 // Renamed class behind a "use strict" directive — no nB anchor available.
 const mainBundleStrictRenamedFixture =
   '"use strict";var rW=class{async getUserSavedConfiguration(e){return{}}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}async startThread(e){}}';
-// Output of the original merge-after-return patch (first restore).
-const mainBundleV1PatchedFixture =
-  'var __codexLinuxMergeCustomEndpointCatalogModels=function(e,t){return e},nB=class{async getUserSavedConfiguration(e){return{}}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);let r=n.result;try{r=__codexLinuxMergeCustomEndpointCatalogModels(r,await this.getUserSavedConfiguration?.())}catch{}return r}async startThread(e){}}';
-// Output of the backup-branch error-fallback patch.
-const mainBundleV2PatchedFixture =
-  'var __codexLinuxMergeCustomEndpointCatalogModels=function(e,t){return e},nB=class{async getUserSavedConfiguration(e){return{}}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e}),r;try{r=await this.getUserSavedConfiguration?.()}catch{}if(n.error){let e=__codexLinuxMergeCustomEndpointCatalogModels({data:[]},r);if(e.data?.length)return e;throw Error(n.error.message??`Failed to read available models`)}let i=n.result;try{i=__codexLinuxMergeCustomEndpointCatalogModels(i,r)}catch{}return i}async startThread(e){}}';
-
 const catalogFixture = {
   models: [
     {
@@ -201,21 +172,32 @@ function instantiatePatchedClient(patched, { className = "nB", uuidVar = "o" } =
 // Webview allowlist patch
 // ---------------------------------------------------------------------------
 
-test("model picker allowlist patch applies and is idempotent", () => {
-  const patched = applyPatchTwice(applyModelPickerAllowlistPatch, pickerFixture);
-  assert.equal(patched, pickerPatched);
-});
+test("model picker patch targets and preserves models in the latest picker bundle", () => {
+  const descriptor = require("./patch.js").descriptors.find((entry) => entry.id === "model-picker-allowlist");
+  assert.match(latestPickerAsset, descriptor.pattern);
 
-test("model picker allowlist patch applies to current model-list-filter bundle", () => {
-  const patched = applyPatchTwice(applyModelPickerAllowlistPatch, currentPickerFixture);
-  assert.equal(patched, currentPickerPatched);
-});
-
-test("model picker allowlist composes with API key model visibility", () => {
-  const { value: patched, warnings } = captureWarns(() =>
-    applyPatchTwice(applyModelPickerAllowlistPatch, apiKeyVisibilityPickerFixture));
-  assert.equal(patched, currentPickerPatched);
-  assert.equal(warnings.length, 0);
+  const patched = applyPatchTwice(applyModelPickerAllowlistPatch, latestPickerFixture);
+  assert.match(patched, /__codexLinuxCustomEndpointReasoningFallback/);
+  assert.doesNotMatch(patched, /l=o&&e!==`amazonBedrock`/);
+  const Ue = vm.runInNewContext(`${patched};Ue`, {
+    Re: (effort) => ["low", "medium", "high", "ultra"].includes(effort),
+  });
+  const result = Ue({
+    authMethod: "apikey",
+    availableModels: new Set(),
+    defaultModel: "custom/model",
+    enabledReasoningEfforts: new Set(),
+    includeUltraReasoningEffort: false,
+    models: [{
+      model: "custom/model",
+      hidden: false,
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: [{ reasoningEffort: "medium", description: "Medium" }],
+    }],
+    useHiddenModels: true,
+  });
+  assert.equal(result.models[0].model, "custom/model");
+  assert.equal(result.models[0].supportedReasoningEfforts[0].reasoningEffort, "medium");
 });
 
 test("model picker patch injects catalog fallback from CODEX_HOME", () => {
@@ -244,20 +226,24 @@ test("model picker patch injects catalog into dynamic available_models config", 
 
 test("model picker patch injects catalog into composer menu models", () => {
   withCatalogCodexHome(catalogFixture, () => {
-    for (const fixture of [composerMenuFixture, slashCommandModelFixture]) {
-      const patched = applyModelPickerAllowlistPatch(fixture);
-      assert.match(patched, /__codexLinuxCustomEndpointComposerMenuModels/);
-      assert.match(patched, /cx\/gpt-5\.5/);
-      assert.equal(applyModelPickerAllowlistPatch(patched), patched);
-      new vm.Script(patched);
-    }
+    const descriptor = require("./patch.js").descriptors.find((entry) => entry.id === "composer-menu-models");
+    assert.match(composerMenuAsset, descriptor.pattern);
+    assert.doesNotMatch(
+      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~b1ew1ta1-hVZZ2amZ.js",
+      descriptor.pattern,
+    );
+    const patched = applyModelPickerAllowlistPatch(composerMenuFixture);
+    assert.match(patched, /__codexLinuxCustomEndpointComposerMenuModels/);
+    assert.match(patched, /cx\/gpt-5\.5/);
+    assert.equal(applyModelPickerAllowlistPatch(patched), patched);
+    new vm.Script(patched);
   });
 });
 
 test("model picker patch drops raw provider models that would crash current selector", () => {
   withCatalogCodexHome(catalogFixture, () => {
     const patched = applyModelPickerAllowlistPatch(currentPickerFixture);
-    const vbe = vm.runInNewContext(`${patched};vbe`, { pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort) });
+    const vbe = vm.runInNewContext(`${patched};vbe`, { Re: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort) });
     const result = vbe({
       authMethod: "apiKey",
       availableModels: new Set(),
@@ -283,7 +269,7 @@ test("model picker patch drops raw provider models that would crash current sele
 test("model picker keeps catalog model efforts when enabled-effort filter is empty", () => {
   withCatalogCodexHome(catalogFixture, () => {
     const patched = applyModelPickerAllowlistPatch(currentPickerFixture);
-    const vbe = vm.runInNewContext(`${patched};vbe`, { pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort) });
+    const vbe = vm.runInNewContext(`${patched};vbe`, { Re: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort) });
     const result = vbe({
       authMethod: "apiKey",
       availableModels: new Set(),
@@ -301,7 +287,7 @@ test("model picker keeps catalog model efforts when enabled-effort filter is emp
 test("model picker exposes ultra for a custom endpoint", () => {
   const patched = applyPatchTwice(applyModelPickerAllowlistPatch, currentPickerFixture);
   const vbe = vm.runInNewContext(`${patched};vbe`, {
-    pq: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort),
+    Re: (effort) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(effort),
   });
   const result = vbe({
     authMethod: "apikey",
@@ -320,7 +306,7 @@ test("model picker exposes ultra for a custom endpoint", () => {
     useHiddenModels: false,
   });
   assert.deepEqual(
-    result.models[0].supportedReasoningEfforts.map((effort) => effort.reasoningEffort),
+    Array.from(result.models[0].supportedReasoningEfforts, (effort) => effort.reasoningEffort),
     ["medium", "ultra"],
   );
 });
@@ -466,36 +452,6 @@ test("main bundle patch injects helper without a class-name anchor and after dir
   new vm.Script(patched);
 });
 
-test("main bundle patch upgrades stale v1 patch output", async () => {
-  const patched = applyPatchTwice(applyMainBundleCatalogModelsPatch, mainBundleV1PatchedFixture);
-  assert.match(patched, /__codexLinuxMergeCustomEndpointCatalogModelsV3/);
-  assert.match(patched, /__cdlxCfg/);
-  assert.doesNotMatch(patched, /__codexLinuxMergeCustomEndpointCatalogModels\(\w+,await this\.getUserSavedConfiguration/);
-  new vm.Script(patched);
-  await withCatalogCodexHome(catalogFixture, async () => {
-    const client = instantiatePatchedClient(patched);
-    client.ensureReady = async () => {};
-    client.sendInternalRequest = async () => ({ result: { data: [] } });
-    client.getUserSavedConfiguration = async () => ({});
-    const { data } = await client.listModels({});
-    assert.equal(data[0].model, "cx/gpt-5.5");
-  });
-});
-
-test("main bundle patch upgrades stale v2 patch output", async () => {
-  const patched = applyPatchTwice(applyMainBundleCatalogModelsPatch, mainBundleV2PatchedFixture);
-  assert.match(patched, /__codexLinuxMergeCustomEndpointCatalogModelsV3/);
-  assert.match(patched, /__cdlxCfg/);
-  new vm.Script(patched);
-  await withCatalogCodexHome(catalogFixture, async () => {
-    const client = instantiatePatchedClient(patched);
-    client.ensureReady = async () => {};
-    client.sendInternalRequest = async () => ({ error: { message: "provider cannot list models" } });
-    client.getUserSavedConfiguration = async () => ({});
-    assert.equal((await client.listModels({})).data[0].model, "cx/gpt-5.5");
-  });
-});
-
 test("extracted app patch updates split app-server chunks", () => {
   const tempApp = fs.mkdtempSync(path.join(os.tmpdir(), "codex-custom-endpoint-model-picker-main-"));
   try {
@@ -514,51 +470,8 @@ test("extracted app patch updates split app-server chunks", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Sidebar provider filter
-// ---------------------------------------------------------------------------
-
-test("sidebar provider filter patch applies and is idempotent", () => {
-  const patched = applyPatchTwice(applySidebarProviderFilterPatch, sidebarFixture);
-  assert.equal(patched, sidebarPatched);
-});
-
-test("sidebar history keeps the upstream state DB selection", () => {
-  const patched = applyPatchTwice(applySidebarProviderFilterPatch, sidebarStateDbOnlyFixture);
-  assert.equal(patched, sidebarStateDbOnlyPatched);
-});
-
-test("sidebar history keeps the upstream all-provider filter", () => {
-  const patched = applyPatchTwice(applySidebarProviderFilterPatch, currentSidebarFixture);
-  assert.equal(patched, currentSidebarPatched);
-  assert.match(patched, /modelProviders:null/);
-  assert.match(patched, /sourceKinds:oh/);
-});
-
-test("sidebar history repairs the stale empty-provider patch", () => {
-  const stale = currentSidebarFixture.replace("modelProviders:null", "modelProviders:[]");
-  assert.equal(applyPatchTwice(applySidebarProviderFilterPatch, stale), currentSidebarFixture);
-});
-
-test("sidebar provider filter targets the current history bundle", () => {
-  const { SIDEBAR_ASSET_PATTERN } = require("./patch.js").internals;
-  assert.match(currentSidebarAsset, SIDEBAR_ASSET_PATTERN);
-});
-
-test("sidebar provider filter patch is idempotent on already-patched async loader", () => {
-  const once = applySidebarProviderFilterPatch(currentSidebarFixture);
-  const twice = applySidebarProviderFilterPatch(once);
-  assert.equal(once, twice);
-});
-
-// ---------------------------------------------------------------------------
 // Drift + wiring
 // ---------------------------------------------------------------------------
-
-test("model picker patch ignores unrelated false forEach markers", () => {
-  const source = `function other(){let z=!1,r=[];r.forEach(console.log)}${pickerFixture}`;
-  const patched = applyPatchTwice(applyModelPickerAllowlistPatch, source);
-  assert.equal(patched, `function other(){let z=!1,r=[];r.forEach(console.log)}${pickerPatched}`);
-});
 
 test("patches warn and no-op when needle is missing", () => {
   const pickerMissing =
@@ -579,13 +492,6 @@ test("patches warn and no-op when needle is missing", () => {
   assert.equal(mainWarnings.length, 1);
   assert.match(mainWarnings[0], /model\/list bridge/);
 
-  const sidebarMissing =
-    'listRecentThreads({cursor:e,limit:t}){return this.params.requestClient.sendRequest(`thread/list`,{limit:t,cursor:e,sortKey:this.recentConversationSortKey,modelProviders:null,archived:!1,sourceKinds:s,extra:1})}';
-  const { value: sidebarValue, warnings: sidebarWarnings } = captureWarns(() =>
-    applySidebarProviderFilterPatch(sidebarMissing),
-  );
-  assert.equal(sidebarValue, sidebarMissing);
-  assert.equal(sidebarWarnings.length, 0);
 });
 
 test("patches no-op silently on unrelated source", () => {
@@ -601,11 +507,6 @@ test("patches no-op silently on unrelated source", () => {
   assert.equal(mainValue, "function x(){}");
   assert.equal(mainWarnings.length, 0);
 
-  const { value: sidebarValue, warnings: sidebarWarnings } = captureWarns(() =>
-    applySidebarProviderFilterPatch("function x(){}"),
-  );
-  assert.equal(sidebarValue, "function x(){}");
-  assert.equal(sidebarWarnings.length, 0);
 });
 
 test("feature stays disabled until listed in features.json", () => {
@@ -626,12 +527,15 @@ test("feature exposes three descriptors on the current engine contract when enab
       [
         ["feature:custom-endpoint-model-picker:main-bundle-catalog-models", "extracted-app:post-webview"],
         ["feature:custom-endpoint-model-picker:model-picker-allowlist", "webview-asset"],
-        ["feature:custom-endpoint-model-picker:sidebar-provider-filter", "webview-asset"],
+        ["feature:custom-endpoint-model-picker:composer-menu-models", "webview-asset"],
       ],
     );
 
-    assert.equal(withEmptyCodexHome(() => descriptors[1].apply(pickerFixture)), pickerPatched);
-    assert.equal(descriptors[2].apply(sidebarFixture), sidebarPatched);
+    const pickerPatched = withEmptyCodexHome(() => descriptors[1].apply(latestPickerFixture));
+    assert.match(pickerPatched, /__codexLinuxCustomEndpointAllowlist/);
+    withCatalogCodexHome(catalogFixture, () => {
+      assert.match(descriptors[2].apply(composerMenuFixture), /__codexLinuxCustomEndpointComposerMenuModels/);
+    });
   });
 });
 
@@ -647,19 +551,21 @@ test("feature participates in extracted app patching and patch report", () => {
       fs.writeFileSync(path.join(buildDir, "main.js"), "console.log('main bundle')");
       fs.writeFileSync(path.join(buildDir, "src-test.js"), mainBundleFixture);
       fs.writeFileSync(path.join(assetsDir, "app-test.png"), "");
-      fs.writeFileSync(path.join(assetsDir, "app-initial~app-main~onboarding-page-ABC.js"), currentPickerFixture);
-      fs.writeFileSync(path.join(assetsDir, "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~XYZ.js"), currentSidebarFixture);
+      fs.writeFileSync(path.join(assetsDir, latestPickerAsset), latestPickerFixture);
+      fs.writeFileSync(path.join(assetsDir, composerMenuAsset), composerMenuFixture);
 
       const report = createPatchReport();
-      withEmptyCodexHome(() => captureWarns(() => patchExtractedApp(tempApp, { featuresRoot: root, report })));
-
-      assert.equal(
-        fs.readFileSync(path.join(assetsDir, "app-initial~app-main~onboarding-page-ABC.js"), "utf8"),
-        currentPickerPatched,
+      withCatalogCodexHome(catalogFixture, () =>
+        captureWarns(() => patchExtractedApp(tempApp, { featuresRoot: root, report })),
       );
-      assert.equal(
-        fs.readFileSync(path.join(assetsDir, "app-initial~app-main~worktree-init-v2-page~remote-conversation-page~new-thread-panel-page~XYZ.js"), "utf8"),
-        currentSidebarPatched,
+
+      assert.match(
+        fs.readFileSync(path.join(assetsDir, latestPickerAsset), "utf8"),
+        /__codexLinuxCustomEndpointAllowlist/,
+      );
+      assert.match(
+        fs.readFileSync(path.join(assetsDir, composerMenuAsset), "utf8"),
+        /__codexLinuxCustomEndpointComposerMenuModels/,
       );
       assert.match(
         fs.readFileSync(path.join(buildDir, "src-test.js"), "utf8"),
@@ -677,11 +583,11 @@ test("feature participates in extracted app patching and patch report", () => {
       );
       assert.ok(mainReport);
       assert.ok(["applied", "already-applied"].includes(mainReport.status));
-      const sidebarReport = report.patches.find(
-        (p) => p.name === "feature:custom-endpoint-model-picker:sidebar-provider-filter",
+      const composerReport = report.patches.find(
+        (p) => p.name === "feature:custom-endpoint-model-picker:composer-menu-models",
       );
-      assert.ok(sidebarReport);
-      assert.ok(["applied", "already-applied"].includes(sidebarReport.status));
+      assert.ok(composerReport);
+      assert.ok(["applied", "already-applied"].includes(composerReport.status));
     } finally {
       fs.rmSync(tempApp, { recursive: true, force: true });
     }

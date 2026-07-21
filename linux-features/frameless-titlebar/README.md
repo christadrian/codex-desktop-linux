@@ -32,6 +32,7 @@ Run the feature's unit tests from the repository root:
 
 ```bash
 node --test linux-features/frameless-titlebar/test.js
+node linux-features/frameless-titlebar/eval.js
 ```
 
 For a manual check, enable the feature as above, rebuild, and launch the app:

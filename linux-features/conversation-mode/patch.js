@@ -3,9 +3,9 @@
 const HANDLER_NAME = "linux-read-aloud";
 const RUNTIME_VERSION = "conversation-mode-v26";
 const CURRENT_DICTATION_ASSET_PATTERN =
-  /^app-initial~app-main~onboarding-page-[A-Za-z0-9_-]+\.js$/;
+  /^app-initial~avatarOverlayCompositionSurface~app-main~new-thread-panel-page~onboarding-page~~e9wvq029-[A-Za-z0-9_-]+\.js$/;
 const CURRENT_COMPOSER_ASSET_PATTERN =
-  /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/;
+  /^app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-[^.]+\.js$/;
 
 function warn(message, patchName) {
   console.warn(`WARN: ${message} - skipping ${patchName}`);
@@ -380,7 +380,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20710,
       ciPolicy: "optional",
-      pattern: /^app-initial~app-main~onboarding-page-[A-Za-z0-9_-]+\.js$/,
+      pattern: /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-[A-Za-z0-9_-]+\.js$/,
       missingDescription: "current primary thread assistant bundle",
       skipDescription: "conversation mode assistant observer patch",
       apply: applyAssistantRenderPatch,

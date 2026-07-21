@@ -12,21 +12,10 @@ const {
   loadLinuxFeaturePatchDescriptors,
 } = require("../../scripts/lib/linux-features.js");
 
-const fixture =
-  'function we(e,t,s){let c=(0,me.c)(53),l;c[0]===e?l=c[1]:(l={hostId:e},c[0]=e,c[1]=l);let u=ue(l)&&(s?.enabled??!0),d=s?.additionalMarketplaceKinds??_e,f=s?.installSuggestionPluginNames??null,p=re(`4218407052`),m=pe(ae(e)?.authMethod??null),h=ve;m?h=xe:p&&(h=be);let g=Ae({additionalMarketplaceKinds:d,includeRemoteCatalog:s?.includeRemoteCatalog??!0,includeVerticalCatalog:!p}),_=ie()';
-
-const patched =
-  'function we(e,t,s){let c=(0,me.c)(53),l;c[0]===e?l=c[1]:(l={hostId:e},c[0]=e,c[1]=l);let u=ue(l)&&(s?.enabled??!0),d=s?.additionalMarketplaceKinds??_e,f=s?.installSuggestionPluginNames??null,p=re(`4218407052`),m=pe(ae(e)?.authMethod??null),h=ve;0;let g=Ae({additionalMarketplaceKinds:d,includeRemoteCatalog:s?.includeRemoteCatalog??!0,includeVerticalCatalog:!p}),_=ie()';
-
-const currentFixture =
-  'function xDt(e,t,n){let r=(0,D2.c)(54),i;r[0]===e?i=r[1]:(i={hostId:e},r[0]=e,r[1]=i);let a=p2(i)&&(n?.enabled??!0),o=n?.additionalMarketplaceKinds??M2,s=n?.installSuggestionPluginNames??null,c=Sj(`4218407052`),l=dEt(Cbt(e)?.authMethod??null),u=ZDt;l?u=$Dt:c&&(u=QDt);let d=kDt({additionalMarketplaceKinds:o,includeRemoteCatalog:n?.includeRemoteCatalog??!0,includeVerticalCatalog:!c})}';
-
-const currentPatched =
-  'function xDt(e,t,n){let r=(0,D2.c)(54),i;r[0]===e?i=r[1]:(i={hostId:e},r[0]=e,r[1]=i);let a=p2(i)&&(n?.enabled??!0),o=n?.additionalMarketplaceKinds??M2,s=n?.installSuggestionPluginNames??null,c=Sj(`4218407052`),l=dEt(Cbt(e)?.authMethod??null),u=ZDt;0;let d=kDt({additionalMarketplaceKinds:o,includeRemoteCatalog:n?.includeRemoteCatalog??!0,includeVerticalCatalog:!c})}';
-const latestFixture =
-  'function VR(e,t,n){let c=Gy(`4218407052`),l=min(e)?.authMethod??null,u;r[2]===l?u=r[3]:(u=Nmn(l),r[2]=l,r[3]=u);let d=u,f=n?.includeRemoteCatalog??!0,p=!c,m}';
-const latestPatched =
-  'function VR(e,t,n){let c=Gy(`4218407052`),l=min(e)?.authMethod??null,u;r[2]===l?u=r[3]:(u=Nmn(l),r[2]=l,r[3]=u);let d=!1,f=n?.includeRemoteCatalog??!0,p=!c,m}';
+const latestAsset =
+  'app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~d8yqlw7s-DLBl6kj-.js';
+const latestInstalledFixture =
+  'function Vt(e,t,i){let a=(0,bn.c)(65),o;a[0]===e?o=a[1]:(o={hostId:e},a[0]=e,a[1]=o);let s=ue(o)&&(i?.enabled??!0),c=i?.additionalMarketplaceKinds??Tn,l=i?.installSuggestionPluginNames??null,u=ie(`4218407052`),d=ce(e)?.authMethod??null,f;a[2]===d?f=a[3]:(f=we(d),a[2]=d,a[3]=f);let p=f,m=i?.includeRemoteCatalog??!0,ee=!u,h}';
 
 function applyPatchTwice(patchFn, source) {
   const applied = patchFn(source);
@@ -34,18 +23,16 @@ function applyPatchTwice(patchFn, source) {
   return applied;
 }
 
-test("marketplace hide guard patch applies and is idempotent", () => {
-  const result = applyPatchTwice(applyMarketplaceHidePatch, fixture);
-  assert.equal(result, patched);
-});
-
-test("marketplace hide guard patch applies to current plugin detail bundle shape", () => {
-  const result = applyPatchTwice(applyMarketplaceHidePatch, currentFixture);
-  assert.equal(result, currentPatched);
-});
-
-test("marketplace hide guard patch applies to latest memoized auth shape", () => {
-  assert.equal(applyPatchTwice(applyMarketplaceHidePatch, latestFixture), latestPatched);
+test("routes and patches the latest shared marketplace hook", () => {
+  const descriptor = require("./patch.js").descriptors[0];
+  assert.match(latestAsset, descriptor.pattern);
+  assert.doesNotMatch(
+    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
+    descriptor.pattern,
+  );
+  const patched = applyPatchTwice(applyMarketplaceHidePatch, latestInstalledFixture);
+  assert.match(patched, /let p=!1,m=/);
+  assert.doesNotMatch(patched, /let p=f,m=/);
 });
 
 test("patch no-ops silently on unrelated source", () => {
@@ -54,16 +41,7 @@ test("patch no-ops silently on unrelated source", () => {
   assert.equal(result, unrelated);
 });
 
-test("routes the current shared plugins hook chunk", () => {
-  const descriptor = require("./patch.js").descriptors[0];
-  assert.match(
-    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
-    descriptor.pattern,
-  );
-  assert.equal(descriptor.apply(latestFixture), latestPatched);
-});
-
-test("patch ignores related bundles without the hide guard", () => {
+test("patch warns when the targeted hook drifts", () => {
   const warnings = [];
   const orig = console.warn;
   console.warn = (...args) => warnings.push(args.map(String).join(" "));
@@ -71,7 +49,8 @@ test("patch ignores related bundles without the hide guard", () => {
     const mismatched = 're(`4218407052`),pe(authMethod),something=else';
     const result = applyMarketplaceHidePatch(mismatched);
     assert.equal(result, mismatched);
-    assert.deepEqual(warnings, []);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /marketplace hide flag/);
   } finally {
     console.warn = orig;
   }
@@ -123,10 +102,7 @@ test("feature exposes one webview-asset descriptor when enabled", () => {
       );
       assert.equal(marketplaceDescs.length, 1);
       assert.equal(marketplaceDescs[0].phase, "webview-asset");
-      assert.equal(
-        marketplaceDescs[0].apply(currentFixture),
-        currentPatched,
-      );
+      assert.match(marketplaceDescs[0].apply(latestInstalledFixture), /let p=!1,m=/);
     },
   );
 });
