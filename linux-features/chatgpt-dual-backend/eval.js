@@ -10,6 +10,7 @@ const {
   applyChatGptEntitlementPatch,
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
+  applyProductModeSwitchPatch,
   applySitesAvailabilityPatch,
   applySitesPluginAvailabilityPatch,
   descriptors,
@@ -35,6 +36,8 @@ const availabilitySource =
   'var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});';
 const sitesPluginSource =
   "var Xo=[{autoInstallOptOutKey:n.bc(n._c),installWhenMissing:!0,name:n._c,syncToRemoteSshHosts:!0,isAvailable:({features:e})=>e.sites},{autoInstallOptOutKey:n.bc(n.lc),installWhenMissing:!0,name:n.lc,isAvailable:({features:e})=>e.inAppBrowserUseAllowed}];class Marketplace{constructor(){this.name=`BundledPluginsMarketplace`}}";
+const productModeSwitchSource =
+  "function mln(e,t){let n=t;return{local:n,workMode:e.authMethod!==`chatgpt`&&e.authMethod!==`apikey`&&e.authMethod!==`personalAccessToken`&&n.status===`allowed`?{status:`denied`,reason:`unsupported-auth`}:n}}";
 
 const entitlementPatched = applyChatGptEntitlementPatch(entitlementSource);
 assert.match(entitlementPatched, /__codexLinuxChatGptBackendSession/);
@@ -105,6 +108,25 @@ assert.equal(
   applyForAsset("app-initial~app-main~legacy.js", entitlementSource),
   entitlementSource,
 );
+const productModeSwitchPatched = applyProductModeSwitchPatch(productModeSwitchSource);
+assert.match(productModeSwitchPatched, /__codexLinuxChatGptProductModeSwitch/);
+assert.equal(applyProductModeSwitchPatch(productModeSwitchPatched), productModeSwitchPatched);
+const productModeAccess = new Function(`${productModeSwitchPatched};return mln`)();
+const allowedWorkMode = { status: "allowed" };
+globalThis.__codexLinuxChatGptBackendSession = { accessToken: "saved" };
+assert.equal(
+  productModeAccess({ authMethod: "api-key" }, allowedWorkMode).workMode,
+  allowedWorkMode,
+);
+delete globalThis.__codexLinuxChatGptBackendSession;
+assert.deepEqual(
+  productModeAccess({ authMethod: "api-key" }, allowedWorkMode).workMode,
+  { status: "denied", reason: "unsupported-auth" },
+);
+assert.match(
+  applyForAsset("app-initial-C-fROkKo.js", productModeSwitchSource),
+  /__codexLinuxChatGptProductModeSwitch/,
+);
 
 const sitesPluginPatched = applySitesPluginAvailabilityPatch(sitesPluginSource);
 assert.match(sitesPluginPatched, /__codexLinuxChatGptSitesPluginAvailable/);
@@ -159,5 +181,5 @@ globalThis.__bridge({
   assert.equal(result.tokenSource, "saved-chatgpt");
   assert.equal(result.token, "token");
   delete globalThis.__bridge;
-  console.log("20/20 current chatgpt-dual-backend eval scenarios passed");
+  console.log("24/24 current chatgpt-dual-backend eval scenarios passed");
 });

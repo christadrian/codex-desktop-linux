@@ -7,9 +7,12 @@ The feature keeps the upstream Chat mode and Quick Chat entitlement available
 when a valid saved ChatGPT session exists. It also keeps Sites available after
 switching Codex task traffic to a custom endpoint such as 9router, including
 retaining the current bundled ChatGPT plugin when upstream endpoint-derived
-feature flags omit `sites`. That plugin owns the ChatGPT surface switch and
-conversation-history UI, so entitlement and request routing alone are not
-enough. The bundled plugin remains eligible without relying on a runtime
+feature flags omit `sites`. The feature also preserves the upstream Work-mode
+access result when custom endpoint authentication is active and a saved
+ChatGPT session exists. Without that patch, upstream converts allowed Work mode
+to `denied/unsupported-auth`, sets `codexOnly`, and renders a static Codex label
+instead of the ChatGPT/Codex selector. The bundled plugin remains eligible
+without relying on a runtime
 `platform` field that upstream no longer supplies to plugin availability
 callbacks. The run-location menu also keeps every Codex Cloud gate enabled, so
 configured cloud environments remain selectable. It does not show these
@@ -49,6 +52,10 @@ ChatGPT-authenticated sessions continue through the unmodified upstream branch.
 The custom-endpoint allowance does not depend on `supportedSurface`: upstream
 sets that value from the ChatGPT surface itself, so requiring it before the
 surface mounts creates a circular gate that hides the switch and history UI.
+The product-mode patch is separate: it keeps the real Work-mode access object
+allowed only while the main-process auth bridge exposes the saved ChatGPT
+session. It does not merely force the selector visible, so selecting ChatGPT
+and every other Work-mode consumer observe the same allowed state.
 
 Enable locally:
 
@@ -81,7 +88,10 @@ test uses the current consolidated main-bundle descriptor and requires the
 ChatGPT plugin to remain installable only when saved ChatGPT authentication is
 valid. The entitlement regression executes the current guard with
 `supportedSurface: false`, matching custom-endpoint startup before the ChatGPT
-surface mounts.
+surface mounts. The product-mode regression executes the current
+`unsupported-auth` guard and verifies both states: saved runtime session keeps
+Work mode allowed; missing runtime session preserves upstream Codex-only
+behavior.
 
 If ChatGPT access expires, sign in again with the Codex CLI and rebuild. The
 feature intentionally stays disabled when no saved ChatGPT session exists.

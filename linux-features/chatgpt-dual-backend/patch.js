@@ -13,6 +13,7 @@ const AUTH_BRIDGE_MARKER = "__codexLinuxChatGptSavedAuthToken";
 const REQUEST_ROUTING_MARKER = "__codexLinuxChatGptOfficialBackend";
 const CLOUD_ACCESS_MARKER = "__codexLinuxChatGptCloudAccess";
 const SITES_PLUGIN_MARKER = "__codexLinuxChatGptSitesPluginAvailable";
+const PRODUCT_MODE_SWITCH_MARKER = "__codexLinuxChatGptProductModeSwitch";
 const CHAT_ENTITLEMENT_GUARD =
   /(function [A-Za-z_$][\w$]*\(\{accountId:[A-Za-z_$][\w$]*,accountLoading:[A-Za-z_$][\w$]*,authLoading:[A-Za-z_$][\w$]*,authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,supportedSurface:[A-Za-z_$][\w$]*\}\)\{return )/;
 const SITES_AVAILABILITY_GUARD =
@@ -25,6 +26,8 @@ const SITES_AVAILABILITY_ASSET_PATTERN =
   /^app-initial-[^.]+\.js$/;
 const SITES_PLUGIN_AVAILABILITY =
   /(\{autoInstallOptOutKey:([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(\2\.([A-Za-z_$][\w$]*)\),installWhenMissing:!0,name:\2\.\4,syncToRemoteSshHosts:!0,isAvailable:)\(\{features:([A-Za-z_$][\w$]*)\}\)=>\5\.sites/;
+const PRODUCT_MODE_SWITCH_GUARD =
+  /(workMode:)(([A-Za-z_$][\w$]*)\.authMethod!==`chatgpt`&&\3\.authMethod!==`apikey`&&\3\.authMethod!==`personalAccessToken`&&)([A-Za-z_$][\w$]*)\.status===`allowed`\?\{status:`denied`,reason:`unsupported-auth`\}:\4/;
 
 function chatGptSession() {
   try {
@@ -87,8 +90,10 @@ function applySitesAvailabilityPatch(source) {
 }
 
 function applyChatGptDualBackendPatch(source) {
-  return applySitesAvailabilityPatch(
-    applyChatGptEntitlementPatch(applyChatGptRequestRoutingPatch(source)),
+  return applyProductModeSwitchPatch(
+    applySitesAvailabilityPatch(
+      applyChatGptEntitlementPatch(applyChatGptRequestRoutingPatch(source)),
+    ),
   );
 }
 
@@ -143,6 +148,25 @@ function applySitesPluginAvailabilityPatch(source) {
   return patched;
 }
 
+function applyProductModeSwitchPatch(source) {
+  if (source.includes(PRODUCT_MODE_SWITCH_MARKER)) return source;
+  if (chatGptSession() == null) return source;
+  if (
+    !source.includes("unsupported-auth") ||
+    !source.includes("workMode:")
+  ) {
+    return source;
+  }
+  const patched = source.replace(
+    PRODUCT_MODE_SWITCH_GUARD,
+    `$1globalThis.__codexLinuxChatGptBackendSession==null&&$2$4.status===\`allowed\`?{status:\`denied\`,reason:\`unsupported-auth\`}:$4/*${PRODUCT_MODE_SWITCH_MARKER}*/`,
+  );
+  if (patched === source) {
+    console.warn("WARN: Could not find current custom-auth product mode guard — skipping ChatGPT/Codex switch patch");
+  }
+  return patched;
+}
+
 function applyChatGptAuthBridgePatch(source) {
   if (source.includes(AUTH_BRIDGE_MARKER)) return source;
   const headPattern = /async function ([A-Za-z_$][\w$]*)\(\{appServerClient:([A-Za-z_$][\w$]*),errorStatus:([A-Za-z_$][\w$]*),failureMessage:([A-Za-z_$][\w$]*),refreshToken:([A-Za-z_$][\w$]*),state:([A-Za-z_$][\w$]*)\}\)\{/;
@@ -174,6 +198,7 @@ module.exports = {
   applyChatGptEntitlementPatch,
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
+  applyProductModeSwitchPatch,
   applySitesAvailabilityPatch,
   applySitesPluginAvailabilityPatch,
   chatGptSession,
@@ -223,6 +248,16 @@ module.exports = {
       apply: applyChatGptEntitlementPatch,
     },
     {
+      id: "product-mode-switch",
+      phase: "webview-asset",
+      order: 20771,
+      ciPolicy: "opt-in",
+      pattern: CHAT_ENTITLEMENT_ASSET_PATTERN,
+      missingDescription: "ChatGPT/Codex product switch webview bundle",
+      skipDescription: "ChatGPT/Codex product switch patch",
+      apply: applyProductModeSwitchPatch,
+    },
+    {
       id: "sites-availability",
       phase: "webview-asset",
       order: 20800,
@@ -237,6 +272,7 @@ module.exports = {
     CHAT_ENTITLEMENT_ASSET_PATTERN,
     CHAT_ENTITLEMENT_GUARD,
     CHATGPT_REQUEST_CLIENT,
+    PRODUCT_MODE_SWITCH_GUARD,
     SITES_AVAILABILITY_ASSET_PATTERN,
     SITES_AVAILABILITY_GUARD,
     SITES_PLUGIN_AVAILABILITY,

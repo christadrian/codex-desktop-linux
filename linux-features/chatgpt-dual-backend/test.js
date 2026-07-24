@@ -15,6 +15,7 @@ const {
   applyCloudAccessPatch,
   applySitesAvailabilityPatch,
   applySitesPluginAvailabilityPatch,
+  applyProductModeSwitchPatch,
   chatGptSession,
   descriptors,
 } = feature;
@@ -31,6 +32,8 @@ const requestRoutingFixture =
   "var Xi;Xi=class extends Ae{constructor(){super({getAdditionalHeaders:Ei})}async listConversations(){return this.safeGet(`/conversations`)}async getModelsResponse(){return this.safeGet(`/models`)}};globalThis.__chatClient=new Xi;globalThis.__customClient=new Ae;";
 const sitesPluginFixture =
   "var Xo=[{autoInstallOptOutKey:n.bc(n._c),installWhenMissing:!0,name:n._c,syncToRemoteSshHosts:!0,isAvailable:({features:e})=>e.sites},{autoInstallOptOutKey:n.bc(n.lc),installWhenMissing:!0,name:n.lc,isAvailable:({features:e})=>e.inAppBrowserUseAllowed}];class Marketplace{constructor(){this.name=`BundledPluginsMarketplace`}}";
+const productModeSwitchFixture =
+  "function mln(e,t){let n=t;return{local:n,workMode:e.authMethod!==`chatgpt`&&e.authMethod!==`apikey`&&e.authMethod!==`personalAccessToken`&&n.status===`allowed`?{status:`denied`,reason:`unsupported-auth`}:n}}";
 
 function withAuth(auth, fn) {
   const oldHome = process.env.CODEX_HOME;
@@ -273,10 +276,57 @@ test("registers bundled ChatGPT plugin retention before webview entitlement patc
   );
 });
 
+test("keeps the ChatGPT and Codex product switch enabled for custom endpoint auth", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    const patched = applyProductModeSwitchPatch(productModeSwitchFixture);
+    assert.match(patched, /__codexLinuxChatGptBackendSession==null/);
+    assert.match(patched, /__codexLinuxChatGptProductModeSwitch/);
+    assert.equal(applyProductModeSwitchPatch(patched), patched);
+    const getAccess = new Function(`${patched};return mln`)();
+    const allowed = { status: "allowed" };
+    globalThis.__codexLinuxChatGptBackendSession = { accessToken: "saved" };
+    try {
+      const access = getAccess({ authMethod: "api-key" }, allowed);
+      assert.equal(access.workMode, allowed);
+      assert.equal(access.workMode.status === "denied" && access.workMode.reason === "unsupported-auth", false);
+    } finally {
+      delete globalThis.__codexLinuxChatGptBackendSession;
+    }
+  });
+});
+
+test("keeps custom auth work mode denied when the runtime auth bridge has no session", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    const patched = applyProductModeSwitchPatch(productModeSwitchFixture);
+    const getAccess = new Function(`${patched};return mln`)();
+    const access = getAccess({ authMethod: "api-key" }, { status: "allowed" });
+    assert.deepEqual(access.workMode, { status: "denied", reason: "unsupported-auth" });
+  });
+});
+
+test("does not expose the product switch without saved ChatGPT auth", () => {
+  withAuth({ tokens: { account_id: "acct_1" } }, () => {
+    assert.equal(applyProductModeSwitchPatch(productModeSwitchFixture), productModeSwitchFixture);
+  });
+});
+
+test("routes the product switch patch to the current consolidated webview asset", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    assert.match(applyForAsset(entitlementAsset, productModeSwitchFixture), /__codexLinuxChatGptProductModeSwitch/);
+    assert.deepEqual(
+      descriptors
+        .filter((descriptor) => descriptor.id === "product-mode-switch")
+        .map(({ id, phase, order }) => ({ id, phase, order })),
+      [{ id: "product-mode-switch", phase: "webview-asset", order: 20771 }],
+    );
+  });
+});
+
 test("exports the current auth bridge and entitlement patch APIs", () => {
   assert.equal(typeof feature.applyChatGptAuthBridgePatch, "function");
   assert.equal(typeof feature.applyChatGptEntitlementPatch, "function");
   assert.equal(typeof feature.applyChatGptRequestRoutingPatch, "function");
   assert.equal(typeof feature.applySitesAvailabilityPatch, "function");
   assert.equal(typeof feature.applySitesPluginAvailabilityPatch, "function");
+  assert.equal(typeof feature.applyProductModeSwitchPatch, "function");
 });
