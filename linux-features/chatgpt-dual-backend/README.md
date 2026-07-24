@@ -6,13 +6,14 @@ the desktop's built-in ChatGPT backend for Chat, Sites, and Codex Cloud.
 The feature keeps the upstream Chat mode and Quick Chat entitlement available
 when a valid saved ChatGPT session exists. It also keeps Sites available after
 switching Codex task traffic to a custom endpoint such as 9router, including
-retaining the bundled Sites plugin when upstream endpoint-derived feature flags omit it. The
-bundled plugin remains eligible without relying on a runtime `platform` field
-that upstream no longer supplies to plugin availability callbacks. The
-run-location menu also keeps every Codex Cloud gate enabled, so configured
-cloud environments remain selectable. It
-does not show these surfaces
-when `auth.json` has no usable session.
+retaining the current bundled ChatGPT plugin when upstream endpoint-derived
+feature flags omit `sites`. That plugin owns the ChatGPT surface switch and
+conversation-history UI, so entitlement and request routing alone are not
+enough. The bundled plugin remains eligible without relying on a runtime
+`platform` field that upstream no longer supplies to plugin availability
+callbacks. The run-location menu also keeps every Codex Cloud gate enabled, so
+configured cloud environments remain selectable. It does not show these
+surfaces when `auth.json` has no usable session.
 
 Current upstream keeps the Chat/Quick Chat entitlement and Sites availability
 in different shared chunks. The feature routes independent patches to the exact
@@ -72,7 +73,10 @@ node linux-features/chatgpt-dual-backend/eval.js
 
 The routing regression test executes both clients. It requires the ChatGPT
 client to resolve `/models` against the official backend and the generic client
-to leave `/models` relative for custom-endpoint handling.
+to leave `/models` relative for custom-endpoint handling. The plugin regression
+test uses the current consolidated main-bundle descriptor and requires the
+ChatGPT plugin to remain installable only when saved ChatGPT authentication is
+valid.
 
 If ChatGPT access expires, sign in again with the Codex CLI and rebuild. The
 feature intentionally stays disabled when no saved ChatGPT session exists.

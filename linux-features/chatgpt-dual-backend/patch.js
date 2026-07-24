@@ -12,6 +12,7 @@ const SITES_AVAILABILITY_MARKER = "__codexLinuxChatGptSitesAvailable";
 const AUTH_BRIDGE_MARKER = "__codexLinuxChatGptSavedAuthToken";
 const REQUEST_ROUTING_MARKER = "__codexLinuxChatGptOfficialBackend";
 const CLOUD_ACCESS_MARKER = "__codexLinuxChatGptCloudAccess";
+const SITES_PLUGIN_MARKER = "__codexLinuxChatGptSitesPluginAvailable";
 const CHAT_ENTITLEMENT_GUARD =
   /(function [A-Za-z_$][\w$]*\(\{accountId:[A-Za-z_$][\w$]*,accountLoading:[A-Za-z_$][\w$]*,authLoading:[A-Za-z_$][\w$]*,authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,supportedSurface:([A-Za-z_$][\w$]*)\}\)\{return )/;
 const SITES_AVAILABILITY_GUARD =
@@ -22,6 +23,8 @@ const CHATGPT_REQUEST_CLIENT =
   /([A-Za-z_$][\w$]*=class extends [A-Za-z_$][\w$]*\{constructor\(\)\{super\(\{getAdditionalHeaders:[A-Za-z_$][\w$]*\}\)\})/;
 const SITES_AVAILABILITY_ASSET_PATTERN =
   /^app-initial-[^.]+\.js$/;
+const SITES_PLUGIN_AVAILABILITY =
+  /(\{autoInstallOptOutKey:([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(\2\.([A-Za-z_$][\w$]*)\),installWhenMissing:!0,name:\2\.\4,syncToRemoteSshHosts:!0,isAvailable:)\(\{features:([A-Za-z_$][\w$]*)\}\)=>\5\.sites/;
 
 function chatGptSession() {
   try {
@@ -122,6 +125,24 @@ function applyCloudAccessPatch(source) {
   return patched;
 }
 
+function applySitesPluginAvailabilityPatch(source) {
+  if (source.includes(SITES_PLUGIN_MARKER)) return source;
+  if (chatGptSession() == null) return source;
+  const patched = source.replace(
+    SITES_PLUGIN_AVAILABILITY,
+    `$1()=>!0/*${SITES_PLUGIN_MARKER}*/`,
+  );
+  if (
+    patched === source &&
+    source.includes("BundledPluginsMarketplace") &&
+    source.includes("installWhenMissing") &&
+    source.includes(".sites")
+  ) {
+    console.warn("WARN: Could not find current bundled ChatGPT plugin availability descriptor — skipping ChatGPT plugin retention patch");
+  }
+  return patched;
+}
+
 function applyChatGptAuthBridgePatch(source) {
   if (source.includes(AUTH_BRIDGE_MARKER)) return source;
   const headPattern = /async function ([A-Za-z_$][\w$]*)\(\{appServerClient:([A-Za-z_$][\w$]*),errorStatus:([A-Za-z_$][\w$]*),failureMessage:([A-Za-z_$][\w$]*),refreshToken:([A-Za-z_$][\w$]*),state:([A-Za-z_$][\w$]*)\}\)\{/;
@@ -154,6 +175,7 @@ module.exports = {
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
   applySitesAvailabilityPatch,
+  applySitesPluginAvailabilityPatch,
   chatGptSession,
   descriptors: [
     {
@@ -162,6 +184,13 @@ module.exports = {
       order: 20760,
       ciPolicy: "opt-in",
       apply: applyChatGptAuthBridgePatch,
+    },
+    {
+      id: "sites-plugin-availability",
+      phase: "main-bundle",
+      order: 20761,
+      ciPolicy: "opt-in",
+      apply: applySitesPluginAvailabilityPatch,
     },
     {
       id: "cloud-access",
@@ -210,5 +239,6 @@ module.exports = {
     CHATGPT_REQUEST_CLIENT,
     SITES_AVAILABILITY_ASSET_PATTERN,
     SITES_AVAILABILITY_GUARD,
+    SITES_PLUGIN_AVAILABILITY,
   },
 };

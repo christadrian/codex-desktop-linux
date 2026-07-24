@@ -14,6 +14,7 @@ const {
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
   applySitesAvailabilityPatch,
+  applySitesPluginAvailabilityPatch,
   chatGptSession,
   descriptors,
 } = feature;
@@ -28,6 +29,8 @@ const cloudFixture =
   "function vr(){let{access:P}=Sn();return P}function va(e){let{access:I}=Fn(),De=hr({cloudAccess:I,hasGitRepository:H,isBrowser:!1});return(0,Q.jsx)(Ji,{codexCloudAccess:I})}";
 const requestRoutingFixture =
   "var Xi;Xi=class extends Ae{constructor(){super({getAdditionalHeaders:Ei})}async listConversations(){return this.safeGet(`/conversations`)}async getModelsResponse(){return this.safeGet(`/models`)}};globalThis.__chatClient=new Xi;globalThis.__customClient=new Ae;";
+const sitesPluginFixture =
+  "var Xo=[{autoInstallOptOutKey:n.bc(n._c),installWhenMissing:!0,name:n._c,syncToRemoteSshHosts:!0,isAvailable:({features:e})=>e.sites},{autoInstallOptOutKey:n.bc(n.lc),installWhenMissing:!0,name:n.lc,isAvailable:({features:e})=>e.inAppBrowserUseAllowed}];class Marketplace{constructor(){this.name=`BundledPluginsMarketplace`}}";
 
 function withAuth(auth, fn) {
   const oldHome = process.env.CODEX_HOME;
@@ -246,9 +249,34 @@ test("routes only the dedicated ChatGPT client to the official backend", () => {
   delete globalThis.__customClient;
 });
 
+test("keeps the current bundled ChatGPT plugin available with saved auth", () => {
+  withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
+    const patched = applySitesPluginAvailabilityPatch(sitesPluginFixture);
+    assert.match(patched, /isAvailable:\(\)=>!0\/\*__codexLinuxChatGptSitesPluginAvailable\*\//);
+    assert.equal(applySitesPluginAvailabilityPatch(patched), patched);
+    assert.doesNotThrow(() => new Function("n", patched));
+  });
+});
+
+test("does not retain the bundled ChatGPT plugin without saved auth", () => {
+  withAuth({ tokens: { account_id: "acct_1" } }, () => {
+    assert.equal(applySitesPluginAvailabilityPatch(sitesPluginFixture), sitesPluginFixture);
+  });
+});
+
+test("registers bundled ChatGPT plugin retention before webview entitlement patches", () => {
+  assert.deepEqual(
+    descriptors
+      .filter((descriptor) => descriptor.id === "sites-plugin-availability")
+      .map(({ id, phase, order }) => ({ id, phase, order })),
+    [{ id: "sites-plugin-availability", phase: "main-bundle", order: 20761 }],
+  );
+});
+
 test("exports the current auth bridge and entitlement patch APIs", () => {
   assert.equal(typeof feature.applyChatGptAuthBridgePatch, "function");
   assert.equal(typeof feature.applyChatGptEntitlementPatch, "function");
   assert.equal(typeof feature.applyChatGptRequestRoutingPatch, "function");
   assert.equal(typeof feature.applySitesAvailabilityPatch, "function");
+  assert.equal(typeof feature.applySitesPluginAvailabilityPatch, "function");
 });

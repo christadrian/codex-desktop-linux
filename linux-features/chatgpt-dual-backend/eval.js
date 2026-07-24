@@ -11,6 +11,7 @@ const {
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
   applySitesAvailabilityPatch,
+  applySitesPluginAvailabilityPatch,
   descriptors,
 } = require("./patch.js");
 
@@ -32,6 +33,8 @@ const entitlementSource =
   'function rt({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?ot(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
 const availabilitySource =
   'var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});';
+const sitesPluginSource =
+  "var Xo=[{autoInstallOptOutKey:n.bc(n._c),installWhenMissing:!0,name:n._c,syncToRemoteSshHosts:!0,isAvailable:({features:e})=>e.sites},{autoInstallOptOutKey:n.bc(n.lc),installWhenMissing:!0,name:n.lc,isAvailable:({features:e})=>e.inAppBrowserUseAllowed}];class Marketplace{constructor(){this.name=`BundledPluginsMarketplace`}}";
 
 const entitlementPatched = applyChatGptEntitlementPatch(entitlementSource);
 assert.match(entitlementPatched, /__codexLinuxChatGptBackendSession/);
@@ -91,6 +94,17 @@ assert.equal(
   entitlementSource,
 );
 
+const sitesPluginPatched = applySitesPluginAvailabilityPatch(sitesPluginSource);
+assert.match(sitesPluginPatched, /__codexLinuxChatGptSitesPluginAvailable/);
+assert.match(sitesPluginPatched, /name:n\._c,syncToRemoteSshHosts:!0,isAvailable:\(\)=>!0/);
+assert.equal(applySitesPluginAvailabilityPatch(sitesPluginPatched), sitesPluginPatched);
+assert.deepEqual(
+  descriptors
+    .filter((descriptor) => descriptor.id === "sites-plugin-availability")
+    .map(({ phase, order }) => ({ phase, order })),
+  [{ phase: "main-bundle", order: 20761 }],
+);
+
 const requestRoutingSource =
   "var Xi;Xi=class extends Ae{constructor(){super({getAdditionalHeaders:Ei})}async listConversations(){return this.safeGet(`/conversations`)}async getModelsResponse(){return this.safeGet(`/models`)}};globalThis.__chatClient=new Xi;globalThis.__customClient=new Ae;";
 const requestRoutingPatched = applyChatGptRequestRoutingPatch(requestRoutingSource);
@@ -133,5 +147,5 @@ globalThis.__bridge({
   assert.equal(result.tokenSource, "saved-chatgpt");
   assert.equal(result.token, "token");
   delete globalThis.__bridge;
-  console.log("16/16 current chatgpt-dual-backend eval scenarios passed");
+  console.log("20/20 current chatgpt-dual-backend eval scenarios passed");
 });
