@@ -30,7 +30,7 @@ process.on("exit", () => {
 });
 
 const entitlementSource =
-  'function rt({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?ot(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
+  'function a_a({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?c_a(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
 const availabilitySource =
   'var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});';
 const sitesPluginSource =
@@ -38,9 +38,9 @@ const sitesPluginSource =
 
 const entitlementPatched = applyChatGptEntitlementPatch(entitlementSource);
 assert.match(entitlementPatched, /__codexLinuxChatGptBackendSession/);
-assert.doesNotMatch(entitlementPatched, /additionalRolloutEnabled|rolloutEnabled/);
+assert.match(entitlementPatched, /r!==`chatgpt`\?\{status:`allowed`/);
 assert.equal(applyChatGptEntitlementPatch(entitlementPatched), entitlementPatched);
-const entitlement = new Function("ot", `${entitlementPatched};return rt`)(() => true);
+const entitlement = new Function("c_a", `${entitlementPatched};return a_a`)(() => true);
 assert.deepEqual(
   entitlement({
     accountId: null,
@@ -64,6 +64,18 @@ assert.deepEqual(
     supportedSurface: true,
   }),
   { status: "allowed", accountId: "acct_eval", plan: "plus" },
+);
+assert.deepEqual(
+  entitlement({
+    accountId: null,
+    accountLoading: false,
+    authLoading: false,
+    authMethod: "apikey",
+    authenticatedAccountId: null,
+    plan: null,
+    supportedSurface: false,
+  }),
+  { status: "allowed", accountId: "acct_eval", plan: null },
 );
 
 const availabilityPatched = applySitesAvailabilityPatch(availabilitySource);

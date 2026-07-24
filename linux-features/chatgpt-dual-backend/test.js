@@ -20,7 +20,7 @@ const {
 } = feature;
 
 const entitlementFixture =
-  'function rt({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?ot(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
+  'function a_a({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?c_a(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
 const availabilityFixture =
   'var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});';
 const entitlementAsset = "app-initial-C-fROkKo.js";
@@ -72,11 +72,11 @@ test("patches the current Chat entitlement for custom endpoints", () => {
   withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
     const patched = applyChatGptEntitlementPatch(entitlementFixture);
     assert.match(patched, /globalThis\.__codexLinuxChatGptBackendSession="acct_1"/);
-    assert.match(patched, /o&&r!==`chatgpt`\?\{status:`allowed`/);
+    assert.match(patched, /r!==`chatgpt`\?\{status:`allowed`/);
     assert.equal(applyChatGptEntitlementPatch(patched), patched);
     assert.doesNotThrow(() => new Function("ot", patched));
 
-    const entitlement = new Function("ot", `${patched};return rt`)(() => true);
+    const entitlement = new Function("c_a", `${patched};return a_a`)(() => true);
     assert.deepEqual(
       entitlement({
         accountId: null,
@@ -111,7 +111,7 @@ test("patches the current Chat entitlement for custom endpoints", () => {
         plan: null,
         supportedSurface: false,
       }),
-      { status: "denied", reason: "unsupported-surface" },
+      { status: "allowed", accountId: "acct_1", plan: null },
     );
   });
 });

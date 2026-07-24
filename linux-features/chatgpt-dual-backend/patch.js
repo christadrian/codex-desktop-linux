@@ -14,7 +14,7 @@ const REQUEST_ROUTING_MARKER = "__codexLinuxChatGptOfficialBackend";
 const CLOUD_ACCESS_MARKER = "__codexLinuxChatGptCloudAccess";
 const SITES_PLUGIN_MARKER = "__codexLinuxChatGptSitesPluginAvailable";
 const CHAT_ENTITLEMENT_GUARD =
-  /(function [A-Za-z_$][\w$]*\(\{accountId:[A-Za-z_$][\w$]*,accountLoading:[A-Za-z_$][\w$]*,authLoading:[A-Za-z_$][\w$]*,authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,supportedSurface:([A-Za-z_$][\w$]*)\}\)\{return )/;
+  /(function [A-Za-z_$][\w$]*\(\{accountId:[A-Za-z_$][\w$]*,accountLoading:[A-Za-z_$][\w$]*,authLoading:[A-Za-z_$][\w$]*,authMethod:([A-Za-z_$][\w$]*),authenticatedAccountId:[A-Za-z_$][\w$]*,plan:[A-Za-z_$][\w$]*,supportedSurface:[A-Za-z_$][\w$]*\}\)\{return )/;
 const SITES_AVAILABILITY_GUARD =
   /([A-Za-z_$][\w$]*=[A-Za-z_$][\w$]*\([A-Za-z_$][\w$]*,\(\{get:([A-Za-z_$][\w$]*)\}\)=>\{)(if\(!\2\([A-Za-z_$][\w$]*,`637432221`\)\)return`unavailable`;)/;
 const CHAT_ENTITLEMENT_ASSET_PATTERN =
@@ -59,8 +59,8 @@ function applyChatGptEntitlementPatch(source) {
   }
   return source.replace(
     CHAT_ENTITLEMENT_GUARD,
-    (_match, prefix, authMethod, supportedSurface) =>
-      `globalThis.${PATCH_MARKER}=${JSON.stringify(session.accountId)};${prefix}${supportedSurface}&&${authMethod}!==\`chatgpt\`?{status:\`allowed\`,accountId:globalThis.${PATCH_MARKER},plan:null}:`,
+    (_match, prefix, authMethod) =>
+      `globalThis.${PATCH_MARKER}=${JSON.stringify(session.accountId)};${prefix}${authMethod}!==\`chatgpt\`?{status:\`allowed\`,accountId:globalThis.${PATCH_MARKER},plan:null}:`,
   );
 }
 

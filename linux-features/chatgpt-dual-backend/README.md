@@ -46,6 +46,9 @@ token. Upstream's ChatGPT client continues to make its own authenticated
 requests to the ChatGPT backend; the patch replaces only the custom-endpoint
 `not-chatgpt-auth` denial with the saved ChatGPT account identity. Official
 ChatGPT-authenticated sessions continue through the unmodified upstream branch.
+The custom-endpoint allowance does not depend on `supportedSurface`: upstream
+sets that value from the ChatGPT surface itself, so requiring it before the
+surface mounts creates a circular gate that hides the switch and history UI.
 
 Enable locally:
 
@@ -76,7 +79,9 @@ client to resolve `/models` against the official backend and the generic client
 to leave `/models` relative for custom-endpoint handling. The plugin regression
 test uses the current consolidated main-bundle descriptor and requires the
 ChatGPT plugin to remain installable only when saved ChatGPT authentication is
-valid.
+valid. The entitlement regression executes the current guard with
+`supportedSurface: false`, matching custom-endpoint startup before the ChatGPT
+surface mounts.
 
 If ChatGPT access expires, sign in again with the Codex CLI and rebuild. The
 feature intentionally stays disabled when no saved ChatGPT session exists.
