@@ -83,6 +83,7 @@ function patchFileFirstMatch(filePath, {
     typeof candidate === "string" ? { oldText: candidate, newText } : candidate,
   );
   const alreadyPatched = [newText, alreadyText, ...candidates.map((candidate) => candidate.newText)]
+    .flatMap((text) => (Array.isArray(text) ? text : [text]))
     .filter((text) => typeof text === "string" && text.length > 0)
     .some((text) => source.includes(text));
   if (alreadyPatched) {
@@ -345,6 +346,10 @@ patchFileFirstMatch(path.join(scriptsDir, "installManifest.mjs"), {
   ],
   newText:
     'linux:[".config/google-chrome/NativeMessagingHosts",".config/google-chrome-beta/NativeMessagingHosts",".config/google-chrome-unstable/NativeMessagingHosts",".config/BraveSoftware/Brave-Browser/NativeMessagingHosts",".config/chromium/NativeMessagingHosts"]',
+  alreadyText: [
+    'linux:[".config/google-chrome/NativeMessagingHosts",".config/google-chrome-beta/NativeMessagingHosts",".config/google-chrome-unstable/NativeMessagingHosts",".config/BraveSoftware/Brave-Browser/NativeMessagingHosts",".config/chromium/NativeMessagingHosts"]',
+    'linux:[".config/google-chrome/NativeMessagingHosts",".config/google-chrome-beta/NativeMessagingHosts",".config/google-chrome-unstable/NativeMessagingHosts",".config/BraveSoftware/Brave-Browser/NativeMessagingHosts",".config/chromium/NativeMessagingHosts",".config/thorium/NativeMessagingHosts"]',
+  ],
 });
 
 patchFile(path.join(scriptsDir, "check-native-host-manifest.js"), [

@@ -106,7 +106,7 @@ test("descriptor is optional and targets app main webview chunks", () => {
     descriptors.map((descriptor) => [descriptor.id, descriptor.phase, descriptor.ciPolicy]),
     [["api-key-model-visibility-ui", "webview-asset", "optional"]],
   );
-  assert.equal(descriptors[0].pattern.test("app-initial~app-main~onboarding-page-abc.js"), true);
+  assert.equal(descriptors[0].pattern.test("app-initial-C-fROkKo.js"), true);
   assert.equal(descriptors[0].pattern.test("settings-page-abc.js"), false);
 });
 
@@ -177,7 +177,7 @@ test("enabled descriptor patches a matching extracted webview asset", () => {
   withFeatureConfig(["api-key-model-visibility"], (featuresRoot) => {
     withTempDir((extractedDir) => {
       const assetsDir = path.join(extractedDir, "webview", "assets");
-      const assetPath = path.join(assetsDir, "app-initial~app-main~fixture.js");
+      const assetPath = path.join(assetsDir, "app-initial-C-fROkKo.js");
       fs.mkdirSync(assetsDir, { recursive: true });
       fs.writeFileSync(assetPath, modelCatalogFixture());
 

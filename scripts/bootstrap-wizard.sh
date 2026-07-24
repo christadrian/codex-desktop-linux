@@ -771,7 +771,30 @@ for feature_id in disable:
     if feature_id not in features and feature_id not in current:
         die(f"Unknown Linux feature id: {feature_id}")
 
-final = [feature_id for feature_id in current if feature_id not in set(disable)]
+def features_conflict(left, right):
+    return (
+        right in features[left]["conflicts"]
+        or left in features[right]["conflicts"]
+    )
+
+explicit_conflicts = []
+for index, feature_id in enumerate(enable):
+    for other_id in enable[index + 1:]:
+        if features_conflict(feature_id, other_id):
+            explicit_conflicts.append(f"{feature_id}, {other_id}")
+if explicit_conflicts:
+    die(f"Explicitly enabled Linux features conflict: {'; '.join(explicit_conflicts)}")
+
+disable_set = set(disable)
+replaced_conflicts = []
+for current_id in current:
+    if current_id not in features or current_id in enable or current_id in disable_set:
+        continue
+    if any(features_conflict(current_id, enabled_id) for enabled_id in enable):
+        disable_set.add(current_id)
+        replaced_conflicts.append(current_id)
+
+final = [feature_id for feature_id in current if feature_id not in disable_set]
 for feature_id in enable:
     if feature_id not in final:
         final.append(feature_id)
@@ -794,6 +817,8 @@ if apply_changes and (enable or disable):
     updated_config["enabled"] = final
     config_path.write_text(json.dumps(updated_config, indent=2) + "\n")
     print(f"[setup] Updated Linux feature config: {config_path}")
+    for feature_id in replaced_conflicts:
+        print(f"[setup] Disabled conflicting Linux feature: {feature_id}")
 elif not config_path.exists():
     print(f"[setup] Linux feature config: {config_path} (not created yet)")
 else:

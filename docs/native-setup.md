@@ -49,6 +49,9 @@ updater state, and optional Linux feature manifests.
 
 It can write the git-ignored `linux-features/features.json` file for the next
 build. You can choose features by id, number, or range in the prompt.
+Explicitly enabling a feature replaces any currently enabled feature that its
+manifest conflicts with. Explicitly selecting both conflicting features is
+rejected so the requested configuration is never ambiguous.
 
 The wizard is intentionally separate from `make bootstrap-native`,
 `make install-native`, `make package`, and `make install`, which stay

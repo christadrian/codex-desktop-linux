@@ -13,7 +13,7 @@ const {
 } = require("../../scripts/lib/linux-features.js");
 
 const latestAsset =
-  'app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~d8yqlw7s-DLBl6kj-.js';
+  'app-initial-C-fROkKo.js';
 const latestInstalledFixture =
   'function Vt(e,t,i){let a=(0,bn.c)(65),o;a[0]===e?o=a[1]:(o={hostId:e},a[0]=e,a[1]=o);let s=ue(o)&&(i?.enabled??!0),c=i?.additionalMarketplaceKinds??Tn,l=i?.installSuggestionPluginNames??null,u=ie(`4218407052`),d=ce(e)?.authMethod??null,f;a[2]===d?f=a[3]:(f=we(d),a[2]=d,a[3]=f);let p=f,m=i?.includeRemoteCatalog??!0,ee=!u,h}';
 
@@ -27,7 +27,7 @@ test("routes and patches the latest shared marketplace hook", () => {
   const descriptor = require("./patch.js").descriptors[0];
   assert.match(latestAsset, descriptor.pattern);
   assert.doesNotMatch(
-    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~gwqc41kz-Bj9ubaFn.js",
+    "unrelated-bundle.js",
     descriptor.pattern,
   );
   const patched = applyPatchTwice(applyMarketplaceHidePatch, latestInstalledFixture);

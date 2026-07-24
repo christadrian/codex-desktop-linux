@@ -66,13 +66,29 @@ function applyAuthenticatedProxyPatch(currentSource) {
         `${electronVar}.net.fetch($3,{method:$4,headers:$5,body:$6(),signal:$7,credentials:$8?\`include\`:\`same-origin\`}):` +
         "await this.performProgressRequest({body:$6(),headers:$5,method:$4,onUploadProgress:$2,resolvedUrl:$3,signal:$7,useSessionCookies:$8});",
     );
-  } else if (
+  } else {
+    const currentFetchGate = new RegExp(
+      `(${JS_IDENT})==null\\?await ${electronVar}\\.net\\.fetch\\(`,
+    );
+    const desktopFetchIndex = patchedSource.indexOf("performDesktopFetch");
+    const currentFetchMatch = currentFetchGate.exec(patchedSource);
+    if (
+      currentFetchMatch != null &&
+      currentFetchMatch.index > desktopFetchIndex &&
+      currentFetchMatch.index < desktopFetchIndex + 20_000
+    ) {
+      patchedSource = patchedSource.replace(
+        currentFetchGate,
+        "$1==null&&!codexLinuxProxyAuthEntry()?await " + `${electronVar}.net.fetch(`,
+      );
+    } else if (
     patchedSource.includes("performDesktopFetch") &&
     !patchedSource.includes("!codexLinuxProxyAuthEntry()?await")
-  ) {
-    console.warn(
-      "WARN: Could not route Linux proxy-auth desktop fetches through ClientRequest",
-    );
+    ) {
+      console.warn(
+        "WARN: Could not route Linux proxy-auth desktop fetches through ClientRequest",
+      );
+    }
   }
 
   const requestNeedle =

@@ -10,7 +10,7 @@ const scenarios = [
     run() {
       const descriptor = require("./patch.js").descriptors[0];
       assert.match(
-        "app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~d8yqlw7s-DLBl6kj-.js",
+        "app-initial-C-fROkKo.js",
         descriptor.pattern,
       );
       const source =

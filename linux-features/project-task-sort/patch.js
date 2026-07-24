@@ -1,10 +1,10 @@
 "use strict";
 
 const currentCreationTime =
-  "case`local`:return e.conversation==null?e.pendingWorktree.createdAt:t===`updated_at`?e.conversation.recencyAt??e.conversation.updatedAt:e.conversation.createdAt";
+  "case`local`:return n.conversation==null?n.pendingWorktree.createdAt:t(xnr,n.conversation.id)??n.conversation.updatedAt";
 const patchedCreationTime =
   currentCreationTime +
-  "??(/^local:[\\da-f]{8}-[\\da-f]{4}-7[\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(e.key)?Number.parseInt(e.key.slice(6).replaceAll(`-`,``).slice(0,12),16):e.conversation.recencyAt??e.conversation.updatedAt)";
+  "??(/^local:[\\da-f]{8}-[\\da-f]{4}-7[\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(n.key)?Number.parseInt(n.key.slice(6).replaceAll(`-`,``).slice(0,12),16):n.conversation.recencyAt??n.conversation.updatedAt)";
 
 function countOccurrences(source, needle) {
   return source.split(needle).length - 1;
@@ -35,8 +35,7 @@ const descriptors = [
     phase: "webview-asset",
     order: 20_900,
     ciPolicy: "optional",
-    pattern:
-      /^app-initial~app-main~onboarding-page~projects-index-page~quick-chat-window-page~codex-micro~iqsnin5k-[^.]+\.js$/,
+    pattern: /^app-initial-[^.]+\.js$/,
     missingDescription: "project task sort webview bundle",
     skipDescription: "project task creation timestamp feature patch",
     apply: applyProjectTaskSortPatch,

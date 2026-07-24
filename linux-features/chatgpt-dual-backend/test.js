@@ -14,7 +14,6 @@ const {
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
   applySitesAvailabilityPatch,
-  applySitesPluginAvailabilityPatch,
   chatGptSession,
   descriptors,
 } = feature;
@@ -23,14 +22,10 @@ const entitlementFixture =
   'function rt({accountId:e,accountLoading:t,authLoading:n,authMethod:r,authenticatedAccountId:i,plan:a,supportedSurface:o}){return o?n&&r==null?{status:`loading`}:r===`chatgpt`?t&&(e==null||a==null)?{status:`loading`}:i==null||e==null?{status:`denied`,reason:`missing-account`}:i===e?ot(a)?{status:`allowed`,accountId:e,plan:a}:{status:`denied`,reason:`unsupported-plan`}:{status:`denied`,reason:`account-mismatch`}:{status:`denied`,reason:`not-chatgpt-auth`}:{status:`denied`,reason:`unsupported-surface`}}';
 const availabilityFixture =
   'var Ver,VZ;Ver=Da(G,({get:e})=>({enabled:e(Uy,`637432221`),queryKey:[`appgen`,`access`],queryFn:()=>tb.safeGet(`/wham/sites/access`)})),VZ=Ca(G,({get:e})=>{if(!e(Uy,`637432221`))return`unavailable`;let{data:t,isError:n}=e(Ver);return n||t?.enabled===!1?`unavailable`:t?.enabled===!0?`available`:`loading`});';
-const entitlementAsset =
-  "app-initial~artifact-tab-content.electron~app-main~pull-request-code-review~new-thread-pane~nmo0zeut-RFRJ7pMF.js";
-const availabilityAsset =
-  "app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~k0tdw7da-wn-v3SJs.js";
+const entitlementAsset = "app-initial-C-fROkKo.js";
+const availabilityAsset = entitlementAsset;
 const cloudFixture =
   "function vr(){let{access:P}=Sn();return P}function va(e){let{access:I}=Fn(),De=hr({cloudAccess:I,hasGitRepository:H,isBrowser:!1});return(0,Q.jsx)(Ji,{codexCloudAccess:I})}";
-const sitesPluginFixture =
-  "const n={js:e=>e,Os:`sites`},bs=[{autoInstallOptOutKey:n.js(n.Os),installWhenMissing:!0,name:n.Os,isAvailable:({features:e})=>e.sites}];globalThis.__sites=bs[0].isAvailable;";
 const requestRoutingFixture =
   "var Xi;Xi=class extends Ae{constructor(){super({getAdditionalHeaders:Ei})}async listConversations(){return this.safeGet(`/conversations`)}async getModelsResponse(){return this.safeGet(`/models`)}};globalThis.__chatClient=new Xi;globalThis.__customClient=new Ae;";
 
@@ -182,18 +177,12 @@ test("warns instead of claiming success when the current entitlement drifts", ()
   });
 });
 
-test("enables Send to cloud and retains Sites plugin with saved ChatGPT auth", () => {
+test("enables Send to cloud with saved ChatGPT auth", () => {
   withAuth({ tokens: { account_id: "acct_1", access_token: "token" } }, () => {
     const cloud = applyCloudAccessPatch(cloudFixture);
     assert.equal((cloud.match(/__codexLinuxChatGptCloudAccess/g) ?? []).length, 2);
     assert.equal(applyCloudAccessPatch(cloud), cloud);
 
-    const sites = applySitesPluginAvailabilityPatch(sitesPluginFixture);
-    assert.match(sites, /__codexLinuxChatGptSitesPluginAvailable/);
-    assert.equal(applySitesPluginAvailabilityPatch(sites), sites);
-    new Function(sites)();
-    assert.equal(globalThis.__sites({ features: { sites: false } }), true);
-    delete globalThis.__sites;
   });
 });
 

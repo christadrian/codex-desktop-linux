@@ -27,12 +27,14 @@ control endpoint and must not be exposed directly over TCP or forwarded as a
 network service.
 
 Authority startup is serialized by an owner-only lock next to the socket. The
-feature fails closed if either path already exists; it never guesses that an
-existing live socket is stale. Before launch, the runtime hook probes an
-existing socket. It preserves endpoints that still accept connections and
-removes only disconnected socket and lock paths owned by the current user.
-This lets Desktop recover automatically after a forced or abnormal termination
-without deleting another user's endpoint.
+lock records the owning Linux process identity, so a later Desktop launch can
+reclaim it only when that exact process no longer exists. An existing socket is
+probed before recovery: connectable endpoints and live or unverifiable owners
+still fail closed, while an unbound socket inode from the dead owner is removed
+only if its filesystem identity is unchanged.
+Legacy locks without owner metadata remain protected for 15 seconds, longer
+than the authority startup timeout, before they can be reclaimed when no socket
+exists.
 
 ## SSH setup
 
@@ -103,7 +105,6 @@ Run focused tests with:
 
 ```bash
 node --test linux-features/shared-app-server-socket/test.js
-node linux-features/shared-app-server-socket/eval.js
 ```
 
 Set `CODEX_CLI_PATH` to include the stock authority/socket/proxy lifecycle test:
@@ -112,8 +113,6 @@ Set `CODEX_CLI_PATH` to include the stock authority/socket/proxy lifecycle test:
 CODEX_CLI_PATH="/absolute/path/to/real/codex" node --test linux-features/shared-app-server-socket/test.js
 ```
 
-The feature depends on upstream's current local transport factory, exported
-WebSocket transport, and `app-server proxy` command. It supplies the transport's
-native `createConnection` extension point instead of duplicating upstream
-WebSocket lifecycle code. Bundle drift causes the optional patch to warn and
-skip instead of modifying an unknown surface.
+The feature depends on upstream's current local transport factory, WebSocket
+adapter, and `app-server proxy` command. Bundle drift causes the optional patch
+to warn and skip instead of modifying an unknown surface.

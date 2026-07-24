@@ -2,10 +2,8 @@
 
 const HANDLER_NAME = "linux-read-aloud";
 const RUNTIME_VERSION = "conversation-mode-v26";
-const CURRENT_DICTATION_ASSET_PATTERN =
-  /^app-initial~avatarOverlayCompositionSurface~app-main~new-thread-panel-page~onboarding-page~~e9wvq029-[A-Za-z0-9_-]+\.js$/;
-const CURRENT_COMPOSER_ASSET_PATTERN =
-  /^app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-[^.]+\.js$/;
+const CURRENT_DICTATION_ASSET_PATTERN = /^app-initial-[^.]+\.js$/;
+const CURRENT_COMPOSER_ASSET_PATTERN = /^app-initial-[^.]+\.js$/;
 
 function warn(message, patchName) {
   console.warn(`WARN: ${message} - skipping ${patchName}`);
@@ -123,7 +121,92 @@ function objectPropVar(objectSource, name, fallback) {
   return objectSource.match(new RegExp(`(?:^|,)\\s*${escapeRegExp(name)}:(${JS_IDENT})(?:,|$)`))?.[1] ?? fallback;
 }
 
+function exposeCurrentComposerConversationId(source) {
+  const componentMatch = source.match(
+    new RegExp(
+      `function (${JS_IDENT})\\((${JS_IDENT})\\)\\{let ${JS_IDENT}=\\(0,${JS_IDENT}\\.c\\)\\([^)]*\\),\\{([^{}]*voiceControls:${JS_IDENT}[^{}]*)\\}=\\2,`,
+    ),
+  );
+  if (componentMatch == null || objectPropVar(componentMatch[3], "conversationId", null) != null) {
+    return source;
+  }
+  const componentName = componentMatch[1];
+  const callPattern = new RegExp(
+    `\\(0,${JS_IDENT}\\.jsx\\)\\(${escapeRegExp(componentName)},\\{([\\s\\S]{0,10000}?voiceControls:${JS_IDENT})\\}\\)`,
+  );
+  const callMatch = callPattern.exec(source);
+  if (callMatch == null) {
+    return source;
+  }
+  const nearby = source.slice(callMatch.index + callMatch[0].length, callMatch.index + callMatch[0].length + 3000);
+  const conversationId = nearby.match(new RegExp(`conversationId:(${JS_IDENT})`))?.[1] ?? null;
+  if (conversationId == null) {
+    return source;
+  }
+  const propsWithConversation = `${callMatch[1].replace(
+    /voiceControls:/,
+    `conversationId:${conversationId},voiceControls:`,
+  )}`;
+  let patched = source.replace(callPattern, (match) =>
+    match.replace(callMatch[1], propsWithConversation),
+  );
+  patched = patched.replace(
+    componentMatch[0],
+    componentMatch[0].replace(
+      "voiceControls:",
+      "conversationId:codexLinuxConversationId,voiceControls:",
+    ),
+  );
+  return patched;
+}
+
 function currentComposerBinding(source) {
+  const currentPropsPattern = new RegExp(
+    `function (${JS_IDENT})\\((${JS_IDENT})\\)\\{let ${JS_IDENT}=\\(0,${JS_IDENT}\\.c\\)\\([^)]*\\),\\{([^{}]*voiceControls:${JS_IDENT}[^{}]*)\\}=\\2,`,
+    "g",
+  );
+  for (const propsMatch of source.matchAll(currentPropsPattern)) {
+    const componentName = propsMatch[1];
+    const propsObject = propsMatch[3];
+    const voiceControlsVar = objectPropVar(propsObject, "voiceControls", null);
+    const requiredProps = ["isResponseInProgress", "onStop", "submitBlockReason"];
+    if (
+      voiceControlsVar == null ||
+      !requiredProps.every((name) => objectPropVar(propsObject, name, null) != null)
+    ) {
+      continue;
+    }
+    const functionBodyStart = propsMatch.index + propsMatch[0].length;
+    const voiceControlsPattern = new RegExp(
+      `\\{([^{}]*isDictationButtonVisible:[^{}]*startDictation:[^{}]*stopDictation:[^{}]*)\\}\\s*=\\s*${escapeRegExp(voiceControlsVar)}`,
+      "g",
+    );
+    voiceControlsPattern.lastIndex = functionBodyStart;
+    const voiceControlsMatch = voiceControlsPattern.exec(source);
+    if (voiceControlsMatch == null) {
+      continue;
+    }
+    const callPattern = new RegExp(
+      `\\(0,${JS_IDENT}\\.jsx\\)\\(${escapeRegExp(componentName)},\\{([\\s\\S]{0,10000}?voiceControls:${JS_IDENT})\\}\\)`,
+      "g",
+    );
+    for (const callMatch of source.matchAll(callPattern)) {
+      const callProps = callMatch[1];
+      const conversationId =
+        objectPropVar(callProps, "conversationId", null) ??
+        source
+          .slice(callMatch.index, callMatch.index + callMatch[0].length + 2500)
+          .match(new RegExp(`conversationId:(${JS_IDENT})`))?.[1] ??
+        null;
+      if (conversationId != null) {
+        return {
+          conversationId,
+          propsObject: `${propsObject},conversationId:${conversationId}`,
+          voiceControlsObject: voiceControlsMatch[1],
+        };
+      }
+    }
+  }
   const propsPattern = new RegExp(`function ${JS_IDENT}\\(\\{([^{}]*voiceControls:${JS_IDENT}[^{}]*)\\}\\)\\{`, "g");
   for (const propsMatch of source.matchAll(propsPattern)) {
     const propsObject = propsMatch[1];
@@ -197,6 +280,7 @@ function applyComposerControlPatch(source) {
   if (source.includes("codexLinuxConversationSync?.(") && source.includes("codexLinuxConversationToggle?.(")) {
     return source;
   }
+  source = exposeCurrentComposerConversationId(source);
   const binding = currentComposerBinding(source);
   if (binding == null) {
     warn("Could not resolve composer prop aliases", "conversation mode composer control patch");
@@ -260,8 +344,11 @@ function applyDictationEndpointPatch(source) {
   }
 
   const micConstraintsPattern = /([A-Za-z_$][\w$]*)=await ([A-Za-z_$][\w$]*)\(\{channelCount:1\}\)/u;
+  const currentStreamPattern = /stream:([A-Za-z_$][\w$]*)\(\{channelCount:1\}\)/u;
   const cleanupPattern =
     /([A-Za-z_$][\w$]*)&&\(\1\.ondataavailable=null,\1\.onstop=null\),([A-Za-z_$][\w$]*)\.current=null,([A-Za-z_$][\w$]*)\(\);/u;
+  const currentCleanupPattern =
+    /([A-Za-z_$][\w$]*)&&\(\1\.ondataavailable=null,\1\.onstop=null\),([A-Za-z_$][\w$]*)\.current=null,([A-Za-z_$][\w$]*)\(\),([A-Za-z_$][\w$]*)\(\),/u;
   const actionRef = source.match(/let [A-Za-z_$][\w$]*=([A-Za-z_$][\w$]*)\.current\?\?`insert`/)?.[1] ?? null;
   const recorderPattern =
     /let ([A-Za-z_$][\w$]*)=new MediaRecorder\(([A-Za-z_$][\w$]*)\);if\(([A-Za-z_$][\w$]*)\.current=\1,([A-Za-z_$][\w$]*)\.current=\[\],\1\.ondataavailable=([A-Za-z_$][\w$]*)=>\{\5\.data\.size>0&&\4\.current\.push\(\5\.data\)\},\1\.onstop=\(\)=>\{([A-Za-z_$][\w$]*)\(\)\},\1\.start\(\),([A-Za-z_$][\w$]*)\(!0\)/u;
@@ -269,8 +356,8 @@ function applyDictationEndpointPatch(source) {
     /([A-Za-z_$][\w$]*)\.length>0&&\(([A-Za-z_$][\w$]*)\.getInstance\(\)\.dispatchMessage\(`global-dictation-record-history-item`,\{text:\1\}\),([A-Za-z_$][\w$]*)===`send`\?([A-Za-z_$][\w$]*)\.onTranscriptSend\(\1\):\4\.onTranscriptInsert\(\1\)\)/u;
 
   if (
-    !micConstraintsPattern.test(source) ||
-    !cleanupPattern.test(source) ||
+    (!micConstraintsPattern.test(source) && !currentStreamPattern.test(source)) ||
+    (!cleanupPattern.test(source) && !currentCleanupPattern.test(source)) ||
     actionRef == null ||
     !recorderPattern.test(source) ||
     !transcriptPattern.test(source)
@@ -279,14 +366,24 @@ function applyDictationEndpointPatch(source) {
     return source;
   }
 
-  let patched = source.replace(
-    micConstraintsPattern,
-    "$1=await $2({channelCount:1,echoCancellation:!0,noiseSuppression:!0,autoGainControl:!0})",
-  );
-  patched = patched.replace(
-    cleanupPattern,
-    "$1?.codexLinuxConversationCleanup?.(),$1&&($1.ondataavailable=null,$1.onstop=null),$2.current=null,$3();",
-  );
+  let patched = micConstraintsPattern.test(source)
+    ? source.replace(
+        micConstraintsPattern,
+        "$1=await $2({channelCount:1,echoCancellation:!0,noiseSuppression:!0,autoGainControl:!0})",
+      )
+    : source.replace(
+        currentStreamPattern,
+        "stream:$1({channelCount:1,echoCancellation:!0,noiseSuppression:!0,autoGainControl:!0})",
+      );
+  patched = cleanupPattern.test(patched)
+    ? patched.replace(
+        cleanupPattern,
+        "$1?.codexLinuxConversationCleanup?.(),$1&&($1.ondataavailable=null,$1.onstop=null),$2.current=null,$3();",
+      )
+    : patched.replace(
+        currentCleanupPattern,
+        "$1?.codexLinuxConversationCleanup?.(),$1&&($1.ondataavailable=null,$1.onstop=null),$2.current=null,$3(),$4(),",
+      );
   patched = patched.replace(
     recorderPattern,
     (_needle, recorderVar, streamVar, recorderRefVar, chunksRefVar, dataVar, finishFn, activeSetterVar) =>
@@ -380,7 +477,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20710,
       ciPolicy: "optional",
-      pattern: /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-[A-Za-z0-9_-]+\.js$/,
+      pattern: /^app-initial-[^.]+\.js$/,
       missingDescription: "current primary thread assistant bundle",
       skipDescription: "conversation mode assistant observer patch",
       apply: applyAssistantRenderPatch,

@@ -15,11 +15,11 @@ const {
 const pickerSource =
   'function Ue({authMethod:e,availableModels:t,defaultModel:n,enabledReasoningEfforts:r,includeUltraReasoningEffort:i,models:a,useHiddenModels:o}){let s=[],c=null,l=o&&e!==`amazonBedrock`,u=a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`max`)),d=i&&a.some(e=>e.supportedReasoningEfforts.some(({reasoningEffort:e})=>e===`ultra`));return a.forEach(n=>{if(l?t.has(n.model)||n.model.startsWith(`gpt-5.6-`)&&!n.hidden:!n.hidden){let t=i?n.supportedReasoningEfforts:n.supportedReasoningEfforts.filter(({reasoningEffort:e})=>e!==`ultra`),a=[...t].filter(({reasoningEffort:e})=>Re(e)&&r.has(e)),o={...n,supportedReasoningEfforts:a,codexLinuxApiKeyServiceTierModel:e===`apikey`};s.push(o),n.isDefault&&(c=o)}}),c??=s.find(e=>e.model===n)??null,{models:s,defaultModel:c,hasModelSupportingMaxReasoningEffort:u,hasModelSupportingUltraReasoningEffort:d}}';
 const pickerAsset =
-  "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-Dt2LYVtU.js";
+  "app-initial-C-fROkKo.js";
 const composerSource =
   'function FP(e){let t=(0,LP.c)(14),{fromModel:n,toModel:r}=e,{data:i}=gr(),a=i?.models,o;t[0]!==n||t[1]!==a?(o=IP(n,a),t[0]=n,t[1]=a,t[2]=o):o=t[2];let s=o,c=i?.models,l;t[3]!==c||t[4]!==r?(l=IP(r,c),t[3]=c,t[4]=r,t[5]=l):l=t[5];return{from:s,to:l}}';
 const composerAsset =
-  "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-DE26mzOH.js";
+  "app-initial-C-fROkKo.js";
 const mainSource =
   'var rW=class{async getUserSavedConfiguration(e){return{}}async listModels(e){await this.ensureReady();let t=`model/list:${(0,c.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}}';
 
@@ -52,7 +52,7 @@ const scenarios = [
       assert.match(composerAsset, descriptors.find((entry) => entry.id === "composer-menu-models").pattern);
       assert.doesNotMatch("app-initial~app-main~onboarding-page-old.js", descriptors[1].pattern);
       assert.doesNotMatch(
-        "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~b1ew1ta1-hVZZ2amZ.js",
+        "app-initial-C-fROkKo.js",
         descriptors.find((entry) => entry.id === "composer-menu-models").pattern,
       );
     },

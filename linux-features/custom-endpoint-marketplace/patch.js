@@ -31,8 +31,7 @@ module.exports = {
       id: "marketplace-hide-guard",
       name: "custom-endpoint-marketplace-hide-guard",
       phase: "webview-asset",
-      pattern:
-        /^app-initial~artifact-tab-content\.electron~notebook-preview-panel~app-main~pull-request-rout~[^.]+\.js$/,
+      pattern: /^app-initial-[^.]+\.js$/,
       missingDescription: "shared plugins hook bundle",
       skipDescription: "custom-endpoint-marketplace hide guard patch",
       apply: applyMarketplaceHidePatch,

@@ -193,8 +193,53 @@ function upgradeRecordReplayBridgeSource(currentSource) {
 
 function applyRecordReplayChronicleTrayPatch(currentSource) {
   const patchName = "Record & Replay Chronicle tray bridge patch";
+  if (
+    currentSource.includes(
+      "getChronicleSidecarControlState:async()=>codexLinuxChronicleSidecarControlStateAsync()",
+    ) &&
+    currentSource.includes(
+      "toggleChronicleSidecar:async()=>codexLinuxChronicleToggleSidecar()",
+    )
+  ) {
+    return currentSource;
+  }
   if (currentSource.includes("process.platform===`linux`?codexLinuxChronicleSidecarControlState()")) {
     return currentSource;
+  }
+  if (
+    currentSource.includes(
+      "process.platform===`linux`?codexLinuxChronicleSidecarControlStateAsync()",
+    ) &&
+    currentSource.includes(
+      "process.platform===`linux`)return this.desiredState=`running`,codexLinuxChronicleEnsureSidecarRunning(!0)",
+    )
+  ) {
+    return currentSource;
+  }
+  const currentSkysightStatus =
+    "status(){return this.pendingStatus??=this.request(`skysightStatus`).finally(()=>{this.pendingStatus=null}),this.pendingStatus}";
+  if (currentSource.includes(currentSkysightStatus)) {
+    let patched = currentSource.replace(
+      currentSkysightStatus,
+      "status(){return process.platform===`linux`?codexLinuxChronicleSidecarControlStateAsync():(this.pendingStatus??=this.request(`skysightStatus`).finally(()=>{this.pendingStatus=null}),this.pendingStatus)}",
+    );
+    patched = patched.replace(
+      "enable(){return this.desiredState=`running`,this.runSerialized(()=>this.withFailedEnableRollback(async()=>(await this.dependencies.archiveLegacyChronicleSkill(),this.request(`skysightStart`)))).catch(e=>{throw this.desiredState===`running`&&(this.desiredState=`stopped`),e})}",
+      "enable(){if(process.platform===`linux`)return this.desiredState=`running`,codexLinuxChronicleEnsureSidecarRunning(!0);return this.desiredState=`running`,this.runSerialized(()=>this.withFailedEnableRollback(async()=>(await this.dependencies.archiveLegacyChronicleSkill(),this.request(`skysightStart`)))).catch(e=>{throw this.desiredState===`running`&&(this.desiredState=`stopped`),e})}",
+    );
+    patched = patched.replace(
+      "disable(){let e=this.desiredState;return this.desiredState=`stopped`,this.runSerialized(()=>this.stopRecorder()).catch(t=>{throw this.desiredState===`stopped`&&(this.desiredState=e),t})}",
+      "disable(){if(process.platform===`linux`)return this.desiredState=`stopped`,codexLinuxRecordReplayRun([`skysight`,`stop`],15000).then(codexLinuxChronicleControlStateFromSkysight);let e=this.desiredState;return this.desiredState=`stopped`,this.runSerialized(()=>this.stopRecorder()).catch(t=>{throw this.desiredState===`stopped`&&(this.desiredState=e),t})}",
+    );
+    patched = patched.replace(
+      "pause(){let e=this.desiredState;return this.desiredState=`paused`,this.runSerialized(()=>this.request(`skysightPause`)).catch(t=>{throw this.desiredState===`paused`&&(this.desiredState=e),t})}",
+      "pause(){if(process.platform===`linux`)return this.desiredState=`paused`,codexLinuxRecordReplayRun([`skysight`,`pause`],10000).then(codexLinuxChronicleControlStateFromSkysight);let e=this.desiredState;return this.desiredState=`paused`,this.runSerialized(()=>this.request(`skysightPause`)).catch(t=>{throw this.desiredState===`paused`&&(this.desiredState=e),t})}",
+    );
+    patched = patched.replace(
+      "resume(){let e=this.desiredState;return this.desiredState=`running`,this.runSerialized(async()=>{let e=await this.status();return e.state===`stopped`?this.request(`skysightStart`):e.state===`running`?e:this.request(`skysightResume`)}).catch(t=>{throw this.desiredState===`running`&&(this.desiredState=e),t})}",
+      "resume(){if(process.platform===`linux`)return this.desiredState=`running`,codexLinuxChronicleEnsureSidecarRunning(!0);let e=this.desiredState;return this.desiredState=`running`,this.runSerialized(async()=>{let e=await this.status();return e.state===`stopped`?this.request(`skysightStart`):e.state===`running`?e:this.request(`skysightResume`)}).catch(t=>{throw this.desiredState===`running`&&(this.desiredState=e),t})}",
+    );
+    return patched;
   }
 
   const trayControlPattern =
@@ -413,7 +458,7 @@ const descriptors = [
     order: 20695,
     ciPolicy: "optional",
     pattern:
-      /^(?:(?:browser-sidebar-comment-light-dismiss|use-dictation(?!-hotkey))-|app-initial~app-main~.*onboarding-page).*\.js$/,
+      /^(?:(?:browser-sidebar-comment-light-dismiss|use-dictation(?!-hotkey)|app-initial)-|app-initial~app-main~.*onboarding-page).*\.js$/,
     missingDescription: "composer dictation bundle",
     skipDescription: "Record & Replay dictation transcript patch",
     apply: applyRecordReplayDictationTranscriptPatch,

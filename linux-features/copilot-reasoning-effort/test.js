@@ -63,6 +63,15 @@ function currentCopilotReasoningEffortUiFixture() {
   ].join("");
 }
 
+function latestCopilotReasoningEffortUiFixture() {
+  return [
+    "function latest(){let I=u?.authMethod===`copilot`,F=!1,B=!F&&!I&&!0,V=!1,",
+    "kX(`composer.increaseReasoningEffort`,()=>{Se(`increase`)},{enabled:B});",
+    "kX(`composer.decreaseReasoningEffort`,()=>{Se(`decrease`)},{enabled:B});",
+    "return(0,z$.jsx)(Control,{reasoningEffortDisabled:I})}",
+  ].join("");
+}
+
 function withTempDir(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-copilot-reasoning-feature-"));
   try {
@@ -134,19 +143,20 @@ test("persists Copilot reasoning effort through the current default writer", () 
 
 test("current DMG descriptors target only the owning Copilot chunks", () => {
   const settingsChunk =
-    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~2gcv58yj-current.js";
+    "app-initial-C-fROkKo.js";
   const modelListChunk =
-    "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js";
+    "app-initial-C-fROkKo.js";
   const uiChunk =
-    "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
+    "app-initial-C-fROkKo.js";
   const adjacentChunk =
-    "app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~d4kxte0o-BsjKAgmz.js";
+    "app-initial-C-fROkKo.js";
   const loaded = require("./patch.js").descriptors;
 
   assert.equal(loaded[0].pattern.test(settingsChunk), true);
   assert.equal(loaded[1].pattern.test(modelListChunk), true);
   assert.equal(loaded[2].pattern.test(uiChunk), true);
-  assert.ok(loaded.every((descriptor) => descriptor.pattern.test(adjacentChunk) === false));
+  assert.ok(loaded.every((descriptor) => descriptor.pattern.test(adjacentChunk) === true));
+  assert.ok(loaded.every((descriptor) => descriptor.pattern.test("unrelated-bundle.js") === false));
 });
 
 test("keeps filtered current app reasoning efforts for Copilot auth", () => {
@@ -180,6 +190,20 @@ test("allows Copilot auth to use the current app effort controls", () => {
   assert.doesNotMatch(patched, /O=s&&f&&!p&&!0/);
   assert.match(patched, /let q=a&&b&&!0,c/);
   assert.match(patched, /A=O\.length>0,j=!w&&!A/);
+});
+
+test("allows Copilot auth through the latest shortcut gate", () => {
+  const { value: patched, warnings } = withCapturedWarns(() =>
+    applyPatchTwice(
+      applyCopilotReasoningEffortUiPatch,
+      latestCopilotReasoningEffortUiFixture(),
+    ),
+  );
+
+  assert.deepEqual(warnings, []);
+  assert.match(patched, /B=!F&&!0/);
+  assert.match(patched, /reasoningEffortDisabled:!1/);
+  assert.doesNotMatch(patched, /B=!F&&!I&&!0/);
 });
 
 test("current app UI drift warns without touching adjacent gates", () => {
@@ -223,11 +247,11 @@ test("feature descriptor loader exposes the Copilot webview asset patches only w
     );
     assert.ok(descriptors.every((descriptor) => descriptor.ciPolicy === "optional"));
     const currentSettingsChunk =
-      "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~2gcv58yj-current.js";
+      "app-initial-C-fROkKo.js";
     const currentModelListChunk =
-      "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js";
+      "app-initial-C-fROkKo.js";
     const currentUiChunk =
-      "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
+      "app-initial-C-fROkKo.js";
     assert.match(currentSettingsChunk, descriptors[0].pattern);
     assert.match(currentModelListChunk, descriptors[1].pattern);
     assert.match(currentUiChunk, descriptors[2].pattern);
@@ -238,25 +262,19 @@ test("feature descriptor loader exposes the Copilot webview asset patches only w
 test("enabled feature descriptors patch the current app settings chunk", () => {
   const featuresRoot = path.resolve(__dirname, "..");
   const currentSettingsChunk =
-    "app-initial~app-main~new-thread-panel-page~onboarding-page~projects-index-page~appgen-libra~2gcv58yj-current.js";
+    "app-initial-C-fROkKo.js";
   const currentModelListChunk =
-    "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js";
+    "app-initial-C-fROkKo.js";
   const currentUiChunk =
-    "app-initial~app-main~settings-command-menu-section-items~new-thread-panel-page~settings-pag~unq8yzli-current.js";
+    "app-initial-C-fROkKo.js";
 
   withTempFeatureConfig(["copilot-reasoning-effort"], () => {
     withTempDir((extractedDir) => {
-      writeAsset(
-        extractedDir,
-        currentSettingsChunk,
+      writeAsset(extractedDir, currentSettingsChunk, [
         currentCopilotReasoningEffortSettingsFixture(),
-      );
-      writeAsset(
-        extractedDir,
-        currentModelListChunk,
         currentFilteredCopilotReasoningEffortModelListFixture(),
-      );
-      writeAsset(extractedDir, currentUiChunk, currentCopilotReasoningEffortUiFixture());
+        currentCopilotReasoningEffortUiFixture(),
+      ].join(";"));
 
       const descriptors = normalizePatchDescriptors(
         loadLinuxFeaturePatchDescriptors({ featuresRoot }),

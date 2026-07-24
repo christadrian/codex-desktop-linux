@@ -252,8 +252,8 @@ function applyExtractedAppCatalogModelsPatch(extractedDir) {
 // Descriptors
 // ---------------------------------------------------------------------------
 
-const MODEL_PICKER_ASSET_PATTERN = /^app-initial~avatarOverlayCompositionSurface~artifact-tab-content\.electron~app-main~plugin-d~[^.]+\.js$/;
-const COMPOSER_MENU_ASSET_PATTERN = /^app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-[^.]+\.js$/;
+const MODEL_PICKER_ASSET_PATTERN = /^app-initial-[^.]+\.js$/;
+const COMPOSER_MENU_ASSET_PATTERN = /^app-initial-[^.]+\.js$/;
 
 module.exports = {
   descriptors: [

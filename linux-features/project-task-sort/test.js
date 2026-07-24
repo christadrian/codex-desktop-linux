@@ -18,7 +18,7 @@ const {
 } = require("./patch.js");
 
 const currentProjectSource =
-  "function xe(e,t){switch(e.kind){case`local`:return e.conversation==null?e.pendingWorktree.createdAt:t===`updated_at`?e.conversation.recencyAt??e.conversation.updatedAt:e.conversation.createdAt;case`remote`:return((t===`updated_at`?e.task.updated_at??e.task.created_at:e.task.created_at??e.task.updated_at)??0)*1e3}}";
+  "function xe(e,{get:t}){let n=e;switch(n.kind){case`local`:return n.conversation==null?n.pendingWorktree.createdAt:t(xnr,n.conversation.id)??n.conversation.updatedAt;case`remote`:return(n.task.updated_at??n.task.created_at??0)*1e3;case void 0:return 0}}";
 
 function captureWarns(fn) {
   const originalWarn = console.warn;
@@ -81,12 +81,14 @@ test("patch recovers local UUIDv7 creation time", () => {
 
   assert.ok(
     patched.includes(
-      "e.conversation.createdAt??(/^local:[\\da-f]{8}-[\\da-f]{4}-7[\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(e.key)?Number.parseInt(e.key.slice(6).replaceAll(`-`,``).slice(0,12),16):e.conversation.recencyAt??e.conversation.updatedAt)",
+      "t(xnr,n.conversation.id)??n.conversation.updatedAt??(/^local:[\\da-f]{8}-[\\da-f]{4}-7[\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(n.key)?Number.parseInt(n.key.slice(6).replaceAll(`-`,``).slice(0,12),16):n.conversation.recencyAt??n.conversation.updatedAt)",
     ),
   );
 
   const context = {};
+  context.xnr = {};
   vm.runInNewContext(`${patched};globalThis.timestamp=xe`, context);
+  const options = { get: () => null };
   const older = {
     key: "local:019e0000-0000-7000-8000-000000000001",
     kind: "local",
@@ -98,23 +100,18 @@ test("patch recovers local UUIDv7 creation time", () => {
     conversation: { recencyAt: 100 },
   };
 
-  assert.ok(context.timestamp(newer, "created_at") > context.timestamp(older, "created_at"));
-  assert.equal(context.timestamp(older, "updated_at"), 400);
-  assert.equal(
-    context.timestamp({ ...older, conversation: { createdAt: 123, recencyAt: 400 } }, "created_at"),
-    123,
-  );
+  assert.ok(context.timestamp(newer, options) > context.timestamp(older, options));
   assert.equal(
     context.timestamp(
       { ...older, key: "local:legacy-id", conversation: { recencyAt: 500 } },
-      "created_at",
+      options,
     ),
     500,
   );
   assert.equal(
     context.timestamp(
       { ...older, key: "local:019e0000-0000-7garbage", conversation: { recencyAt: 600 } },
-      "created_at",
+      options,
     ),
     600,
   );
@@ -125,19 +122,18 @@ test("patch recovers local UUIDv7 creation time", () => {
         key: "local:019e0000-0000-7000-7000-000000000001",
         conversation: { recencyAt: 700 },
       },
-      "created_at",
+      options,
     ),
     700,
   );
   const remote = { kind: "remote", task: { created_at: 10, updated_at: 20 } };
-  assert.equal(context.timestamp(remote, "created_at"), 10_000);
-  assert.equal(context.timestamp(remote, "updated_at"), 20_000);
+  assert.equal(context.timestamp(remote, options), 20_000);
 });
 
 test("drift leaves the asset byte-identical", () => {
   const source = currentProjectSource.replace(
-    "e.pendingWorktree.createdAt",
-    "e.pendingWorktree.createdTimestamp",
+    "n.pendingWorktree.createdAt",
+    "n.pendingWorktree.createdTimestamp",
   );
   const { value, warnings } = captureWarns(() => applyProjectTaskSortPatch(source));
 
@@ -161,7 +157,7 @@ test("descriptor targets and patches the current project chunk", () => {
     const assetsDir = path.join(tempDir, "webview", "assets");
     const assetPath = path.join(
       assetsDir,
-      "app-initial~app-main~onboarding-page~projects-index-page~quick-chat-window-page~codex-micro~iqsnin5k-zeUk_LBG.js",
+      "app-initial-C-fROkKo.js",
     );
     fs.mkdirSync(assetsDir, { recursive: true });
     fs.writeFileSync(assetPath, currentProjectSource);
@@ -175,15 +171,10 @@ test("descriptor targets and patches the current project chunk", () => {
 
     assert.deepEqual(result, { matched: 1, changed: 1 });
     assert.notEqual(fs.readFileSync(assetPath, "utf8"), currentProjectSource);
+    assert.equal(descriptors[0].pattern.test("unrelated-bundle.js"), false);
     assert.equal(
       descriptors[0].pattern.test(
-        "app-initial~app-main~projects-index-page~remote-conversation-page-y7pwA1Hj.js",
-      ),
-      false,
-    );
-    assert.equal(
-      descriptors[0].pattern.test(
-        "app-initial~app-main~onboarding-page~projects-index-page~quick-chat-window-page~codex-micro~iqsnin5k-zeUk_LBG.js",
+        "app-initial-C-fROkKo.js",
       ),
       true,
     );

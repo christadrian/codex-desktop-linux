@@ -28,13 +28,13 @@ const currentPickerFixture =
 const latestPickerFixture =
   currentPickerFixture.replace("function vbe", "function Ue");
 const latestPickerAsset =
-  'app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-Dt2LYVtU.js';
+  'app-initial-C-fROkKo.js';
 const dynamicConfigFixture =
   'function cMt(e){let t=Wu(K()).safeParse(e.available_models),n=zu().safeParse(e.use_hidden_models),r=K().safeParse(e.default_model);return{availableModels:new Set(t.success?t.data:vq),useHiddenModels:n.success?n.data:yq.useHiddenModels,defaultModel:r.success?r.data:yq.defaultModel}}';
 const composerMenuFixture =
   'function FP(e){let t=(0,LP.c)(14),{fromModel:n,toModel:r}=e,{data:i}=gr(),a=i?.models,o;t[0]!==n||t[1]!==a?(o=IP(n,a),t[0]=n,t[1]=a,t[2]=o):o=t[2];let s=o,c=i?.models,l;t[3]!==c||t[4]!==r?(l=IP(r,c),t[3]=c,t[4]=r,t[5]=l):l=t[5];return{from:s,to:l}}';
 const composerMenuAsset =
-  'app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-DE26mzOH.js';
+  'app-initial-C-fROkKo.js';
 
 const mainBundleFixture =
   'var nB=class{async getUserSavedConfiguration(e){return(await this.readConfig({includeLayers:!1,cwd:e??null})).config}async listModels(e){await this.ensureReady();let t=`model/list:${(0,o.randomUUID)()}`,n=await this.sendInternalRequest({id:t,method:`model/list`,params:e});if(n.error)throw Error(n.error.message??`Failed to read available models`);return n.result}async startThread(e){}}';
@@ -229,7 +229,7 @@ test("model picker patch injects catalog into composer menu models", () => {
     const descriptor = require("./patch.js").descriptors.find((entry) => entry.id === "composer-menu-models");
     assert.match(composerMenuAsset, descriptor.pattern);
     assert.doesNotMatch(
-      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~b1ew1ta1-hVZZ2amZ.js",
+      "unrelated-bundle.js",
       descriptor.pattern,
     );
     const patched = applyModelPickerAllowlistPatch(composerMenuFixture);
@@ -551,8 +551,10 @@ test("feature participates in extracted app patching and patch report", () => {
       fs.writeFileSync(path.join(buildDir, "main.js"), "console.log('main bundle')");
       fs.writeFileSync(path.join(buildDir, "src-test.js"), mainBundleFixture);
       fs.writeFileSync(path.join(assetsDir, "app-test.png"), "");
-      fs.writeFileSync(path.join(assetsDir, latestPickerAsset), latestPickerFixture);
-      fs.writeFileSync(path.join(assetsDir, composerMenuAsset), composerMenuFixture);
+      fs.writeFileSync(
+        path.join(assetsDir, latestPickerAsset),
+        [latestPickerFixture, composerMenuFixture].join(";"),
+      );
 
       const report = createPatchReport();
       withCatalogCodexHome(catalogFixture, () =>

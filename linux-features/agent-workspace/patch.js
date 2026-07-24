@@ -2093,6 +2093,7 @@ function collectAgentWorkspaceRouteAndNavigationPatches(extractedDir) {
   const candidates = fs
     .readdirSync(assetsDir)
     .filter((name) =>
+      /^app-initial-.*\.js$/.test(name) ||
       /^app-initial~app-main~.*\.js$/.test(name) ||
       /(?:^|~)settings-page(?:[-~].*)?\.js$/.test(name)
     )

@@ -1013,7 +1013,7 @@ test("assistant runtime descriptor targets current shared assistant bundles", ()
   assert.ok(descriptor);
   assert.equal(
     descriptor.pattern.test(
-      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js",
+      "app-initial-C-fROkKo.js",
     ),
     true,
   );
@@ -1021,7 +1021,7 @@ test("assistant runtime descriptor targets current shared assistant bundles", ()
     "index-current.js",
     "local-conversation-thread-current.js",
     "local-conversation-turn-current.js",
-    "app-initial~app-main~onboarding-page~hotkey-window-thread-page~editor-diff-page~thread-app-~current.js",
+    "app-initial~app-main~legacy.js",
   ]) {
     assert.equal(descriptor.pattern.test(legacyName), false, legacyName);
   }
@@ -1034,7 +1034,7 @@ test("assistant runtime descriptor fails soft and atomically when the current re
     fs.mkdirSync(assetsDir, { recursive: true });
     const assetPath = path.join(
       assetsDir,
-      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js",
+      "app-initial-C-fROkKo.js",
     );
     const source = "console.log(`assistant render contract moved`);";
     fs.writeFileSync(assetPath, source);
@@ -1062,7 +1062,7 @@ test("assistant runtime descriptor reports applied then already-applied for the 
     fs.mkdirSync(assetsDir, { recursive: true });
     const assetPath = path.join(
       assetsDir,
-      "app-initial~app-main~onboarding-page~hotkey-window-thread-page~quick-chat-window-page~chatg~c33rimzq-current.js",
+      "app-initial-C-fROkKo.js",
     );
     fs.writeFileSync(
       assetPath,

@@ -26,12 +26,12 @@ assert.match(
 assert.match(applyCurrentFallbackFastTierPatch(fallback), /codexLinuxApiKeyFastTier/);
 assert.ok(
   modelDescriptor.pattern.test(
-    "app-initial~avatarOverlayCompositionSurface~artifact-tab-content.electron~app-main~plugin-d~kw7nl1sl-current.js",
+    "app-initial-C-fROkKo.js",
   ),
 );
 assert.match(applyCurrentModelPatch(model), /codexLinuxApiKeyServiceTierModel/);
 assert.match(
-  "app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~business-checkout~oxnpxkxc-current.js",
+  "app-initial-C-fROkKo.js",
   fallbackDescriptor.pattern,
 );
 console.log("5/5 api-key-service-tier eval scenarios passed");

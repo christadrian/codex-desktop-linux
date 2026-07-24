@@ -53,3 +53,24 @@ test("keeps current browser preference routing and patches the current Chrome sk
     fs.rmSync(pluginDir, { recursive: true, force: true });
   }
 });
+
+test("accepts an upstream manifest that already includes every Linux browser", () => {
+  const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-chrome-plugin-manifest-"));
+  const scriptsDir = path.join(pluginDir, "scripts");
+  const manifest =
+    'var g=t=>{let n={linux:[".config/google-chrome/NativeMessagingHosts",".config/google-chrome-beta/NativeMessagingHosts",".config/google-chrome-unstable/NativeMessagingHosts",".config/BraveSoftware/Brave-Browser/NativeMessagingHosts",".config/chromium/NativeMessagingHosts",".config/thorium/NativeMessagingHosts"]}[h.platform()];return n};';
+
+  try {
+    fs.mkdirSync(scriptsDir, { recursive: true });
+    fs.writeFileSync(path.join(scriptsDir, "installManifest.mjs"), manifest, "utf8");
+
+    const result = spawnSync(process.execPath, [patcher, pluginDir], {
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(path.join(scriptsDir, "installManifest.mjs"), "utf8"), manifest);
+    assert.doesNotMatch(result.stderr, /installManifest\.mjs missing patch target/);
+  } finally {
+    fs.rmSync(pluginDir, { recursive: true, force: true });
+  }
+});

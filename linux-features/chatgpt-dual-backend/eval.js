@@ -11,7 +11,6 @@ const {
   applyChatGptRequestRoutingPatch,
   applyCloudAccessPatch,
   applySitesAvailabilityPatch,
-  applySitesPluginAvailabilityPatch,
   descriptors,
 } = require("./patch.js");
 
@@ -75,14 +74,14 @@ const applyForAsset = (assetName, source) => descriptors
   .reduce((current, descriptor) => descriptor.apply(current), source);
 assert.match(
   applyForAsset(
-    "app-initial~artifact-tab-content.electron~app-main~pull-request-code-review~new-thread-pane~nmo0zeut-RFRJ7pMF.js",
+    "app-initial-C-fROkKo.js",
     entitlementSource,
   ),
   /__codexLinuxChatGptBackendSession/,
 );
 assert.match(
   applyForAsset(
-    "app-initial~artifact-tab-content.electron~notebook-preview-panel~app-main~pull-request-rout~k0tdw7da-wn-v3SJs.js",
+    "app-initial-C-fROkKo.js",
     availabilitySource,
   ),
   /__codexLinuxChatGptSitesAvailable/,
@@ -114,10 +113,6 @@ delete globalThis.__customClient;
 const cloud =
   "function vr(){let{access:P}=Sn();return P}function va(e){let{access:I}=Fn(),De=hr({cloudAccess:I,hasGitRepository:H,isBrowser:!1});return(0,Q.jsx)(Ji,{codexCloudAccess:I})}";
 assert.equal((applyCloudAccessPatch(cloud).match(/__codexLinuxChatGptCloudAccess/g) ?? []).length, 2);
-const sitesPlugin =
-  "const bs=[{autoInstallOptOutKey:n.js(n.Os),installWhenMissing:!0,name:n.Os,isAvailable:({features:e})=>e.sites}];";
-assert.match(applySitesPluginAvailabilityPatch(sitesPlugin), /__codexLinuxChatGptSitesPluginAvailable/);
-
 const main = applyChatGptAuthBridgePatch(
   '"use strict";function unrelated(){let r=require("node:fs");return r.existsSync(".")}var JF=class extends Error{};async function XF({appServerClient:e,errorStatus:t,failureMessage:n,refreshToken:r,state:i}){if(!i.attachAuth)return i;if(!r){let t=e.getCachedAuthToken?.();if(t!==void 0)return{...i,tokenSource:`cached`,token:t}}try{let t=await e.getAuthToken({refreshToken:r});return{...i,tokenSource:r?`refreshed`:`loaded`,token:t}}catch(e){throw new JF(n,t,e)}}globalThis.__bridge=XF;',
 );

@@ -124,6 +124,7 @@ test("record-and-replay patch descriptor loads only when feature is enabled", ()
 test("record-and-replay dictation descriptor tracks moved upstream composer bundle", () => {
   const descriptor = descriptors.find((patch) => patch.id === "record-replay-dictation-transcript");
   assert.ok(descriptor);
+  assert.equal(descriptor.pattern.test("app-initial-C-fROkKo.js"), true);
   assert.equal(descriptor.pattern.test("app-initial~app-main~onboarding-page-BUwCKIcU.js"), true);
   assert.equal(descriptor.pattern.test("use-dictation-BUwCKIcU.js"), true);
   assert.equal(descriptor.pattern.test("use-dictation-hotkey-BUwCKIcU.js"), false);
@@ -436,6 +437,55 @@ test("record-and-replay patch wires Linux Chronicle tray controls to Skysight", 
   assert.match(patched, /getChronicleSidecarControlState:\(\)=>process\.platform===`linux`\?codexLinuxChronicleSidecarControlState\(\)/);
   assert.match(patched, /toggleChronicleSidecar:async\(\)=>\{if\(process\.platform===`linux`\)return codexLinuxChronicleToggleSidecar\(\)/);
   assert.match(patched, /e\.pauseChronicleSidecar\(\):e\.resumeChronicleSidecar\(\)/);
+});
+
+test("record-and-replay patch accepts the current async Linux Chronicle controls", () => {
+  const source = [
+    'const cp=require("node:child_process"),fs=require("node:fs"),path=require("node:path");',
+    'var tray={getChronicleSidecarControlState:async()=>codexLinuxChronicleSidecarControlStateAsync(),toggleChronicleSidecar:async()=>codexLinuxChronicleToggleSidecar()};',
+    'var bridge={"linux-record-replay-doctor":async()=>null,"linux-record-replay-status":async()=>null,"get-global-state":async({key:e})=>null};',
+  ].join("");
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(" "));
+  try {
+    const patched = applyRecordReplayMainBridgePatch(source);
+    assert.equal(applyRecordReplayMainBridgePatch(patched), patched);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.doesNotMatch(warnings.join("\n"), /Chronicle tray control callbacks/);
+});
+
+test("record-and-replay patch handles the latest Skysight controller class", () => {
+  const source = [
+    'const cp=require("node:child_process"),fs=require("node:fs"),path=require("node:path");',
+    'var bridge={"get-global-state":async({key:e})=>null};',
+    "class Controller{",
+    "status(){return this.pendingStatus??=this.request(`skysightStatus`).finally(()=>{this.pendingStatus=null}),this.pendingStatus}",
+    "enable(){return this.desiredState=`running`,this.runSerialized(()=>this.withFailedEnableRollback(async()=>(await this.dependencies.archiveLegacyChronicleSkill(),this.request(`skysightStart`)))).catch(e=>{throw this.desiredState===`running`&&(this.desiredState=`stopped`),e})}",
+    "disable(){let e=this.desiredState;return this.desiredState=`stopped`,this.runSerialized(()=>this.stopRecorder()).catch(t=>{throw this.desiredState===`stopped`&&(this.desiredState=e),t})}",
+    "pause(){let e=this.desiredState;return this.desiredState=`paused`,this.runSerialized(()=>this.request(`skysightPause`)).catch(t=>{throw this.desiredState===`paused`&&(this.desiredState=e),t})}",
+    "resume(){let e=this.desiredState;return this.desiredState=`running`,this.runSerialized(async()=>{let e=await this.status();return e.state===`stopped`?this.request(`skysightStart`):e.state===`running`?e:this.request(`skysightResume`)}).catch(t=>{throw this.desiredState===`running`&&(this.desiredState=e),t})}",
+    "}",
+  ].join("");
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(" "));
+  let patched;
+  try {
+    patched = applyRecordReplayMainBridgePatch(source);
+    assert.equal(applyRecordReplayMainBridgePatch(patched), patched);
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.deepEqual(warnings, []);
+  assert.match(patched, /codexLinuxChronicleSidecarControlStateAsync\(\)/);
+  assert.match(patched, /codexLinuxChronicleEnsureSidecarRunning\(!0\)/);
+  assert.match(patched, /\[`skysight`,`stop`\]/);
+  assert.match(patched, /\[`skysight`,`pause`\]/);
 });
 
 test("record-and-replay bridge patch upgrades old patched bundles with active speech endpoint", () => {

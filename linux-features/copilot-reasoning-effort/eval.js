@@ -18,9 +18,12 @@ const settings =
 assert.doesNotMatch(applyCopilotReasoningEffortModelListPatch(models), /e===`copilot`\?\[/);
 assert.match(applyCopilotReasoningEffortUiPatch(ui), /reasoningEffortDisabled:!1/);
 assert.match(applyCopilotReasoningEffortSettingsPatch(settings), /copilot-default-reasoning-effort/);
+const latestUi =
+  "function latest(){let I=u?.authMethod===`copilot`,F=!1,B=!F&&!I&&!0,V=!1;kX(`composer.increaseReasoningEffort`,()=>{Se(`increase`)},{enabled:B});kX(`composer.decreaseReasoningEffort`,()=>{Se(`decrease`)},{enabled:B});return(0,z$.jsx)(Control,{reasoningEffortDisabled:I})}";
+assert.match(applyCopilotReasoningEffortUiPatch(latestUi), /B=!F&&!0/);
 assert.ok(
   descriptors
     .filter(({ id }) => id === "settings" || id === "model-list")
-    .every(({ pattern }) => pattern.test("app-initial~app-main~onboarding-page-qmFVRsFx.js")),
+    .every(({ pattern }) => pattern.test("app-initial-C-fROkKo.js")),
 );
-console.log("4/4 copilot-reasoning-effort eval scenarios passed");
+console.log("5/5 copilot-reasoning-effort eval scenarios passed");
